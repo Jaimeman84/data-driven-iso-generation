@@ -307,7 +307,8 @@ public class CreateIsoMessage  {
         Arrays.fill(primaryBitmap, false);
         Arrays.fill(secondaryBitmap, false);
 
-        System.out.println("Starting ISO message generation from spreadsheet: " + filePath);
+        System.out.println("\n=== Starting ISO message generation from spreadsheet ===");
+        System.out.println("File: " + filePath);
 
         // Load the ISO configuration
         loadConfig("iso_config.json");
@@ -316,23 +317,33 @@ public class CreateIsoMessage  {
         try (FileInputStream fis = new FileInputStream(filePath);
              Workbook workbook = new XSSFWorkbook(fis)) {
             
-            // Get the first sheet (data worksheet)
+            // Get the first sheet and verify it's the correct one
             Sheet sheet = workbook.getSheetAt(0);
-            System.out.println("Processing worksheet: " + sheet.getSheetName());
+            String sheetName = sheet.getSheetName();
+            System.out.println("Found worksheet: " + sheetName);
+            
+            if (!"Auth STIP Integration".equals(sheetName)) {
+                System.out.println("Warning: Expected sheet name 'Auth STIP Integration' but found '" + sheetName + "'");
+                System.out.println("Proceeding with processing anyway...");
+            }
             
             // Start from row 4 (index 3)
             int processedFields = 0;
+            int totalRows = sheet.getLastRowNum();
+            System.out.println("Total rows in sheet: " + totalRows);
+            System.out.println("Starting processing from row 4...\n");
+
             for (int rowNum = 3; rowNum <= sheet.getLastRowNum(); rowNum++) {
                 Row row = sheet.getRow(rowNum);
                 if (row == null) {
-                    System.out.println("Skipping null row at index: " + rowNum);
+                    System.out.println("Row " + (rowNum + 1) + ": Empty row - skipping");
                     continue;
                 }
 
                 // Get Data Element Number (Key) from column A
                 Cell fieldNumberCell = row.getCell(0);
                 if (fieldNumberCell == null) {
-                    System.out.println("Skipping row " + (rowNum + 1) + ": No Field Number found");
+                    System.out.println("Row " + (rowNum + 1) + ": No Field Number in column A - skipping");
                     continue;
                 }
                 String fieldNumber = fieldNumberCell.toString().trim();
@@ -340,7 +351,7 @@ public class CreateIsoMessage  {
                 // Get Name from column B
                 Cell fieldNameCell = row.getCell(1);
                 if (fieldNameCell == null) {
-                    System.out.println("Skipping row " + (rowNum + 1) + ": No Field Name found");
+                    System.out.println("Row " + (rowNum + 1) + ": No Field Name in column B - skipping");
                     continue;
                 }
                 String fieldName = fieldNameCell.toString().trim();
@@ -348,18 +359,21 @@ public class CreateIsoMessage  {
                 // Get Sample Data from column D
                 Cell sampleDataCell = row.getCell(3);
                 if (sampleDataCell == null || sampleDataCell.getCellType() == CellType.BLANK) {
-                    System.out.println("Skipping row " + (rowNum + 1) + ": No Sample Data found");
+                    System.out.println("Row " + (rowNum + 1) + ": No Sample Data in column D - skipping");
                     continue;
                 }
                 String sampleData = sampleDataCell.toString().trim();
 
                 // Skip if any required field is empty
                 if (fieldNumber.isEmpty() || fieldName.isEmpty() || sampleData.isEmpty()) {
-                    System.out.println("Skipping row " + (rowNum + 1) + ": Missing required data");
+                    System.out.println("Row " + (rowNum + 1) + ": Missing required data - skipping");
                     continue;
                 }
 
-                System.out.println("Processing Field: " + fieldNumber + " | Name: " + fieldName + " | Sample Data: " + sampleData);
+                System.out.println("Row " + (rowNum + 1) + ":");
+                System.out.println("  Field Number: " + fieldNumber);
+                System.out.println("  Field Name: " + fieldName);
+                System.out.println("  Sample Data: " + sampleData);
 
                 // Determine the data type from the configuration
                 String dataType = "String"; // Default type
@@ -367,18 +381,26 @@ public class CreateIsoMessage  {
                 if (config != null && config.has("type")) {
                     dataType = config.get("type").asText();
                 }
+                System.out.println("  Data Type: " + dataType);
 
-                // Apply the field update
-                applyBddUpdate(fieldName, sampleData, dataType);
-                processedFields++;
+                try {
+                    // Apply the field update
+                    applyBddUpdate(fieldName, sampleData, dataType);
+                    processedFields++;
+                    System.out.println("  Status: Processed successfully\n");
+                } catch (Exception e) {
+                    System.out.println("  Status: Failed to process - " + e.getMessage() + "\n");
+                }
             }
 
-            System.out.println("Processed " + processedFields + " fields successfully");
+            System.out.println("\n=== Processing Summary ===");
+            System.out.println("Total fields processed: " + processedFields);
 
             // Generate default fields and build ISO message
             generateDefaultFields();
             String isoMessage = buildIsoMessage();
-            System.out.println("Generated ISO Message: " + isoMessage);
+            System.out.println("\nGenerated ISO Message:");
+            System.out.println(isoMessage);
 
             // Write the ISO message back to the spreadsheet in column CE (index 82)
             Row headerRow = sheet.getRow(0);
@@ -398,10 +420,10 @@ public class CreateIsoMessage  {
             // Save the workbook
             try (FileOutputStream fos = new FileOutputStream(filePath)) {
                 workbook.write(fos);
-                System.out.println("Successfully wrote ISO message to spreadsheet in column CE");
+                System.out.println("\nSuccessfully wrote ISO message to spreadsheet in column CE");
             }
         } catch (Exception e) {
-            System.err.println("Error processing spreadsheet: " + e.getMessage());
+            System.err.println("\nError processing spreadsheet: " + e.getMessage());
             e.printStackTrace();
             throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
         }
