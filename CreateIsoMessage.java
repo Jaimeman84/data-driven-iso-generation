@@ -307,6 +307,8 @@ public class CreateIsoMessage  {
         Arrays.fill(primaryBitmap, false);
         Arrays.fill(secondaryBitmap, false);
 
+        System.out.println("Starting ISO message generation from spreadsheet: " + filePath);
+
         // Load the ISO configuration
         loadConfig("iso_config.json");
 
@@ -314,53 +316,94 @@ public class CreateIsoMessage  {
         try (FileInputStream fis = new FileInputStream(filePath);
              Workbook workbook = new XSSFWorkbook(fis)) {
             
+            // Get the first sheet (data worksheet)
             Sheet sheet = workbook.getSheetAt(0);
+            System.out.println("Processing worksheet: " + sheet.getSheetName());
             
             // Start from row 4 (index 3)
+            int processedFields = 0;
             for (int rowNum = 3; rowNum <= sheet.getLastRowNum(); rowNum++) {
                 Row row = sheet.getRow(rowNum);
-                if (row == null) continue;
-
-                // Get Sample Data from column 4 (index 3)
-                Cell sampleDataCell = row.getCell(3);
-                if (sampleDataCell == null || sampleDataCell.getCellType() == CellType.BLANK) {
+                if (row == null) {
+                    System.out.println("Skipping null row at index: " + rowNum);
                     continue;
                 }
 
-                // Get the field number from column 1 (index 0)
+                // Get Data Element Number (Key) from column A
                 Cell fieldNumberCell = row.getCell(0);
-                if (fieldNumberCell == null) continue;
-
-                // Get the field name from column 2 (index 1)
-                Cell fieldNameCell = row.getCell(1);
-                if (fieldNameCell == null) continue;
-
+                if (fieldNumberCell == null) {
+                    System.out.println("Skipping row " + (rowNum + 1) + ": No Field Number found");
+                    continue;
+                }
                 String fieldNumber = fieldNumberCell.toString().trim();
+
+                // Get Name from column B
+                Cell fieldNameCell = row.getCell(1);
+                if (fieldNameCell == null) {
+                    System.out.println("Skipping row " + (rowNum + 1) + ": No Field Name found");
+                    continue;
+                }
                 String fieldName = fieldNameCell.toString().trim();
+
+                // Get Sample Data from column D
+                Cell sampleDataCell = row.getCell(3);
+                if (sampleDataCell == null || sampleDataCell.getCellType() == CellType.BLANK) {
+                    System.out.println("Skipping row " + (rowNum + 1) + ": No Sample Data found");
+                    continue;
+                }
                 String sampleData = sampleDataCell.toString().trim();
 
+                // Skip if any required field is empty
+                if (fieldNumber.isEmpty() || fieldName.isEmpty() || sampleData.isEmpty()) {
+                    System.out.println("Skipping row " + (rowNum + 1) + ": Missing required data");
+                    continue;
+                }
+
+                System.out.println("Processing Field: " + fieldNumber + " | Name: " + fieldName + " | Sample Data: " + sampleData);
+
+                // Determine the data type from the configuration
+                String dataType = "String"; // Default type
+                JsonNode config = fieldConfig.get(fieldNumber);
+                if (config != null && config.has("type")) {
+                    dataType = config.get("type").asText();
+                }
+
                 // Apply the field update
-                applyBddUpdate(fieldName, sampleData, "String"); // Using String as default type
+                applyBddUpdate(fieldName, sampleData, dataType);
+                processedFields++;
             }
+
+            System.out.println("Processed " + processedFields + " fields successfully");
 
             // Generate default fields and build ISO message
             generateDefaultFields();
             String isoMessage = buildIsoMessage();
+            System.out.println("Generated ISO Message: " + isoMessage);
 
             // Write the ISO message back to the spreadsheet in column CE (index 82)
-            for (Row row : sheet) {
-                Cell cell = row.createCell(82); // Column CE
-                if (row.getRowNum() == 0) {
-                    cell.setCellValue("Generated ISO Message");
-                } else if (row.getRowNum() == 1) {
-                    cell.setCellValue(isoMessage);
-                }
+            Row headerRow = sheet.getRow(0);
+            if (headerRow == null) {
+                headerRow = sheet.createRow(0);
             }
+            Cell headerCell = headerRow.createCell(82); // Column CE
+            headerCell.setCellValue("Generated ISO Message");
+
+            Row messageRow = sheet.getRow(1);
+            if (messageRow == null) {
+                messageRow = sheet.createRow(1);
+            }
+            Cell messageCell = messageRow.createCell(82);
+            messageCell.setCellValue(isoMessage);
 
             // Save the workbook
             try (FileOutputStream fos = new FileOutputStream(filePath)) {
                 workbook.write(fos);
+                System.out.println("Successfully wrote ISO message to spreadsheet in column CE");
             }
+        } catch (Exception e) {
+            System.err.println("Error processing spreadsheet: " + e.getMessage());
+            e.printStackTrace();
+            throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
         }
     }
 
