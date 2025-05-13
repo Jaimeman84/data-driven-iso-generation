@@ -317,7 +317,6 @@ public class CreateIsoMessage  {
         try (FileInputStream fis = new FileInputStream(filePath);
              Workbook workbook = new XSSFWorkbook(fis)) {
             
-            // Get the first sheet and verify it's the correct one
             Sheet sheet = workbook.getSheetAt(0);
             String sheetName = sheet.getSheetName();
             System.out.println("Found worksheet: " + sheetName);
@@ -326,70 +325,75 @@ public class CreateIsoMessage  {
                 System.out.println("Warning: Expected sheet name 'Auth STIP Integration' but found '" + sheetName + "'");
                 System.out.println("Proceeding with processing anyway...");
             }
-            
-            // Start from row 4 (index 3)
+
+            // Get Row 1 for Data Element Keys
+            Row headerRow = sheet.getRow(0);
+            if (headerRow == null) {
+                throw new IOException("Header row (Row 1) not found in spreadsheet");
+            }
+
+            // Process Row 4 (index 3)
+            Row dataRow = sheet.getRow(3);
+            if (dataRow == null) {
+                throw new IOException("Data row (Row 4) not found in spreadsheet");
+            }
+
             int processedFields = 0;
-            int totalRows = sheet.getLastRowNum();
-            System.out.println("Total rows in sheet: " + totalRows);
-            System.out.println("Starting processing from row 4...\n");
-
-            for (int rowNum = 3; rowNum <= sheet.getLastRowNum(); rowNum++) {
-                Row row = sheet.getRow(rowNum);
-                if (row == null) {
-                    System.out.println("Row " + (rowNum + 1) + ": Empty row - skipping");
+            // Start from Column B (index 1) and go to Column CD (index 81)
+            for (int colNum = 1; colNum <= 81; colNum++) {
+                // Get the Data Element Key from Row 1
+                Cell headerCell = headerRow.getCell(colNum);
+                if (headerCell == null) {
+                    System.out.println("Column " + getColumnName(colNum) + ": No header found - skipping");
+                    continue;
+                }
+                String dataElementKey = headerCell.toString().trim();
+                if (dataElementKey.isEmpty()) {
+                    System.out.println("Column " + getColumnName(colNum) + ": Empty header - skipping");
                     continue;
                 }
 
-                // Get Data Element Number (Key) from column A
-                Cell fieldNumberCell = row.getCell(0);
-                if (fieldNumberCell == null) {
-                    System.out.println("Row " + (rowNum + 1) + ": No Field Number in column A - skipping");
-                    continue;
-                }
-                String fieldNumber = fieldNumberCell.toString().trim();
-
-                // Get Name from column B
-                Cell fieldNameCell = row.getCell(1);
-                if (fieldNameCell == null) {
-                    System.out.println("Row " + (rowNum + 1) + ": No Field Name in column B - skipping");
-                    continue;
-                }
-                String fieldName = fieldNameCell.toString().trim();
-
-                // Get Sample Data from column D
-                Cell sampleDataCell = row.getCell(3);
-                if (sampleDataCell == null || sampleDataCell.getCellType() == CellType.BLANK) {
-                    System.out.println("Row " + (rowNum + 1) + ": No Sample Data in column D - skipping");
-                    continue;
-                }
-                String sampleData = sampleDataCell.toString().trim();
-
-                // Skip if any required field is empty
-                if (fieldNumber.isEmpty() || fieldName.isEmpty() || sampleData.isEmpty()) {
-                    System.out.println("Row " + (rowNum + 1) + ": Missing required data - skipping");
+                // Get the data from Row 4
+                Cell dataCell = dataRow.getCell(colNum);
+                if (dataCell == null || dataCell.getCellType() == CellType.BLANK) {
+                    System.out.println("Column " + getColumnName(colNum) + " (Key: " + dataElementKey + "): No data - skipping");
                     continue;
                 }
 
-                System.out.println("Row " + (rowNum + 1) + ":");
-                System.out.println("  Field Number: " + fieldNumber);
-                System.out.println("  Field Name: " + fieldName);
+                String sampleData = dataCell.toString().trim();
+                if (sampleData.isEmpty()) {
+                    System.out.println("Column " + getColumnName(colNum) + " (Key: " + dataElementKey + "): Empty data - skipping");
+                    continue;
+                }
+
+                System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
+                System.out.println("  Data Element Key: " + dataElementKey);
                 System.out.println("  Sample Data: " + sampleData);
 
                 // Determine the data type from the configuration
                 String dataType = "String"; // Default type
-                JsonNode config = fieldConfig.get(fieldNumber);
+                JsonNode config = fieldConfig.get(dataElementKey);
                 if (config != null && config.has("type")) {
                     dataType = config.get("type").asText();
                 }
                 System.out.println("  Data Type: " + dataType);
 
                 try {
-                    // Apply the field update
+                    // Get the field name from configuration
+                    String fieldName = "";
+                    if (config != null && config.has("name")) {
+                        fieldName = config.get("name").asText();
+                    } else {
+                        System.out.println("  Warning: No field name found in configuration for key " + dataElementKey);
+                        fieldName = "Field_" + dataElementKey; // Fallback
+                    }
+
+                    // Apply the field update using the same logic as i_create_iso_message
                     applyBddUpdate(fieldName, sampleData, dataType);
                     processedFields++;
-                    System.out.println("  Status: Processed successfully\n");
+                    System.out.println("  Status: Processed successfully");
                 } catch (Exception e) {
-                    System.out.println("  Status: Failed to process - " + e.getMessage() + "\n");
+                    System.out.println("  Status: Failed to process - " + e.getMessage());
                 }
             }
 
@@ -403,18 +407,10 @@ public class CreateIsoMessage  {
             System.out.println(isoMessage);
 
             // Write the ISO message back to the spreadsheet in column CE (index 82)
-            Row headerRow = sheet.getRow(0);
-            if (headerRow == null) {
-                headerRow = sheet.createRow(0);
-            }
             Cell headerCell = headerRow.createCell(82); // Column CE
             headerCell.setCellValue("Generated ISO Message");
 
-            Row messageRow = sheet.getRow(1);
-            if (messageRow == null) {
-                messageRow = sheet.createRow(1);
-            }
-            Cell messageCell = messageRow.createCell(82);
+            Cell messageCell = dataRow.createCell(82);
             messageCell.setCellValue(isoMessage);
 
             // Save the workbook
@@ -427,6 +423,17 @@ public class CreateIsoMessage  {
             e.printStackTrace();
             throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
         }
+    }
+
+    // Helper method to convert column index to column name (e.g., 0=A, 1=B, etc.)
+    private static String getColumnName(int colNum) {
+        StringBuilder columnName = new StringBuilder();
+        while (colNum >= 0) {
+            int remainder = colNum % 26;
+            columnName.insert(0, (char)('A' + remainder));
+            colNum = (colNum / 26) - 1;
+        }
+        return columnName.toString();
     }
 
 }
