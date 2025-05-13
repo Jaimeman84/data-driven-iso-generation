@@ -349,12 +349,6 @@ public class CreateIsoMessage  {
     }
 
     public static void generateIsoFromSpreadsheet(String filePath) throws IOException {
-        // Clear any existing field data
-        isoFields.clear();
-        manuallyUpdatedFields.clear();
-        Arrays.fill(primaryBitmap, false);
-        Arrays.fill(secondaryBitmap, false);
-
         System.out.println("\n=== Starting ISO message generation from spreadsheet ===");
         System.out.println("File: " + filePath);
 
@@ -384,36 +378,32 @@ public class CreateIsoMessage  {
             int totalRows = sheet.getLastRowNum();
             System.out.println("\nProcessing rows 4 to " + (totalRows + 1));
 
-            for (int rowNum = 3; rowNum <= totalRows; rowNum++) {
-                Row dataRow = sheet.getRow(rowNum);
+            // Create a cell for the ISO Message header in column CE
+            Cell headerCell = headerRow.createCell(82); // Column CE
+            headerCell.setCellValue("Generated ISO Message");
+
+            // Process each row starting from row 4
+            for (int rowIndex = 3; rowIndex <= totalRows; rowIndex++) {
+                Row dataRow = sheet.getRow(rowIndex);
                 if (dataRow == null) {
-                    System.out.println("\nSkipping empty row " + (rowNum + 1));
+                    System.out.println("\nSkipping empty row " + (rowIndex + 1));
                     continue;
                 }
 
-                // Check if row has any data in columns B to CD
-                boolean hasData = false;
-                for (int colNum = 1; colNum <= 81; colNum++) {
-                    Cell cell = dataRow.getCell(colNum);
-                    if (cell != null && !getCellValueAsString(cell).trim().isEmpty()) {
-                        hasData = true;
-                        break;
-                    }
-                }
+                System.out.println("\n=== Processing Row " + (rowIndex + 1) + " ===");
 
-                if (!hasData) {
-                    System.out.println("\nSkipping row " + (rowNum + 1) + ": No data found");
-                    continue;
-                }
+                // Clear previous field data for new row
+                isoFields.clear();
+                manuallyUpdatedFields.clear();
+                Arrays.fill(primaryBitmap, false);
+                Arrays.fill(secondaryBitmap, false);
 
-                System.out.println("\n=== Processing Row " + (rowNum + 1) + " ===");
                 int processedFields = 0;
-
                 // Start from Column B (index 1) and go to Column CD (index 81)
                 for (int colNum = 1; colNum <= 81; colNum++) {
                     // Get the Data Element Key from Row 1
-                    Cell headerCell = headerRow.getCell(colNum);
-                    String dataElementKey = getCellValueAsString(headerCell).trim();
+                    Cell headerCell2 = headerRow.getCell(colNum);
+                    String dataElementKey = getCellValueAsString(headerCell2).trim();
                     if (dataElementKey.isEmpty()) {
                         continue;
                     }
@@ -456,28 +446,23 @@ public class CreateIsoMessage  {
                     }
                 }
 
-                // Generate ISO message for this row
-                generateDefaultFields();
-                String isoMessage = buildIsoMessage();
-                System.out.println("\nGenerated ISO Message for Row " + (rowNum + 1) + ":");
-                System.out.println(isoMessage);
+                if (processedFields > 0) {
+                    System.out.println("\n=== Row " + (rowIndex + 1) + " Processing Summary ===");
+                    System.out.println("Total fields processed: " + processedFields);
 
-                // Write the ISO message back to the spreadsheet in column CE (index 82)
-                Cell messageCell = dataRow.createCell(82);
-                messageCell.setCellValue(isoMessage);
+                    // Generate default fields and build ISO message
+                    generateDefaultFields();
+                    String isoMessage = buildIsoMessage();
+                    System.out.println("\nGenerated ISO Message for Row " + (rowIndex + 1) + ":");
+                    System.out.println(isoMessage);
 
-                System.out.println("Processed " + processedFields + " fields in row " + (rowNum + 1));
-
-                // Clear the fields for next row
-                isoFields.clear();
-                manuallyUpdatedFields.clear();
-                Arrays.fill(primaryBitmap, false);
-                Arrays.fill(secondaryBitmap, false);
+                    // Write the ISO message back to the spreadsheet in column CE
+                    Cell messageCell = dataRow.createCell(82);
+                    messageCell.setCellValue(isoMessage);
+                } else {
+                    System.out.println("\nNo fields processed for Row " + (rowIndex + 1) + " - skipping ISO message generation");
+                }
             }
-
-            // Add header for the ISO message column
-            Cell headerCell = headerRow.createCell(82); // Column CE
-            headerCell.setCellValue("Generated ISO Message");
 
             // Save the workbook
             try (FileOutputStream fos = new FileOutputStream(filePath)) {
