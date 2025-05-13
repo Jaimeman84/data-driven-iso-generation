@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.datatable.DataTable;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.hssf.usermodel.HSSFFormulaEvaluator;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
 import java.util.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.math.BigDecimal;
 
 import static utilities.CustomTestData.generateCustomValue;
 import static utilities.CustomTestData.generateRandomText;
@@ -311,12 +314,21 @@ public class CreateIsoMessage  {
                 if (DateUtil.isCellDateFormatted(cell)) {
                     return cell.getDateCellValue().toString();
                 } else {
-                    // Convert to string and remove any decimal points and trailing zeros
-                    String numericValue = String.valueOf(cell.getNumericCellValue());
-                    if (numericValue.contains(".")) {
-                        numericValue = numericValue.replaceAll("\\.0*$", "");
+                    // Use DataFormatter to get the formatted string value exactly as it appears in Excel
+                    DataFormatter formatter = new DataFormatter();
+                    String value = formatter.formatCellValue(cell);
+                    
+                    // If the value contains 'E' (scientific notation), convert it to plain number
+                    if (value.contains("E")) {
+                        // Use BigDecimal to handle large numbers without scientific notation
+                        double numericValue = cell.getNumericCellValue();
+                        value = new BigDecimal(String.valueOf(numericValue)).toPlainString();
+                        // Remove decimal point and trailing zeros if present
+                        if (value.contains(".")) {
+                            value = value.replaceAll("\\.0*$", "");
+                        }
                     }
-                    return numericValue;
+                    return value;
                 }
             case STRING:
                 return cell.getStringCellValue();
@@ -324,13 +336,12 @@ public class CreateIsoMessage  {
                 return String.valueOf(cell.getBooleanCellValue());
             case FORMULA:
                 try {
-                    return String.valueOf(cell.getNumericCellValue());
-                } catch (IllegalStateException e) {
-                    try {
-                        return String.valueOf(cell.getStringCellValue());
-                    } catch (IllegalStateException e2) {
-                        return cell.getCellFormula();
-                    }
+                    // For formula cells, get the cached result
+                    DataFormatter formatter = new DataFormatter();
+                    return formatter.formatCellValue(cell, new HSSFFormulaEvaluator((HSSFWorkbook) cell.getSheet().getWorkbook()));
+                } catch (Exception e) {
+                    // If formula evaluation fails, get the raw formula
+                    return cell.getCellFormula();
                 }
             default:
                 return "";
