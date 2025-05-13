@@ -380,82 +380,109 @@ public class CreateIsoMessage  {
                 throw new IOException("Header row (Row 1) not found in spreadsheet");
             }
 
-            // Process Row 4 (index 3)
-            Row dataRow = sheet.getRow(3);
-            if (dataRow == null) {
-                throw new IOException("Data row (Row 4) not found in spreadsheet");
-            }
+            // Process from Row 4 (index 3) onwards
+            int totalRows = sheet.getLastRowNum();
+            System.out.println("\nProcessing rows 4 to " + (totalRows + 1));
 
-            int processedFields = 0;
-            // Start from Column B (index 1) and go to Column CD (index 81)
-            for (int colNum = 1; colNum <= 81; colNum++) {
-                // Get the Data Element Key from Row 1
-                Cell headerCell = headerRow.getCell(colNum);
-                String dataElementKey = getCellValueAsString(headerCell).trim();
-                if (dataElementKey.isEmpty()) {
-                    System.out.println("Column " + getColumnName(colNum) + ": Empty header - skipping");
+            for (int rowNum = 3; rowNum <= totalRows; rowNum++) {
+                Row dataRow = sheet.getRow(rowNum);
+                if (dataRow == null) {
+                    System.out.println("\nSkipping empty row " + (rowNum + 1));
                     continue;
                 }
 
-                // Get the data from Row 4
-                Cell dataCell = dataRow.getCell(colNum);
-                String sampleData = getCellValueAsString(dataCell).trim();
-                if (sampleData.isEmpty()) {
-                    System.out.println("Column " + getColumnName(colNum) + " (Key: " + dataElementKey + "): Empty data - skipping");
+                // Check if row has any data in columns B to CD
+                boolean hasData = false;
+                for (int colNum = 1; colNum <= 81; colNum++) {
+                    Cell cell = dataRow.getCell(colNum);
+                    if (cell != null && !getCellValueAsString(cell).trim().isEmpty()) {
+                        hasData = true;
+                        break;
+                    }
+                }
+
+                if (!hasData) {
+                    System.out.println("\nSkipping row " + (rowNum + 1) + ": No data found");
                     continue;
                 }
 
-                System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
-                System.out.println("  Data Element Key: " + dataElementKey);
-                System.out.println("  Sample Data: " + sampleData);
+                System.out.println("\n=== Processing Row " + (rowNum + 1) + " ===");
+                int processedFields = 0;
 
-                // Determine the data type from the configuration
-                String dataType = "String"; // Default type
-                JsonNode config = fieldConfig.get(dataElementKey);
-                if (config != null && config.has("type")) {
-                    dataType = config.get("type").asText();
-                }
-                System.out.println("  Data Type: " + dataType);
-
-                try {
-                    // Get the field name from configuration
-                    String fieldName = "";
-                    if (config != null && config.has("name")) {
-                        fieldName = config.get("name").asText();
-                    } else {
-                        System.out.println("  Warning: No field name found in configuration for key " + dataElementKey);
-                        fieldName = "Field_" + dataElementKey; // Fallback
+                // Start from Column B (index 1) and go to Column CD (index 81)
+                for (int colNum = 1; colNum <= 81; colNum++) {
+                    // Get the Data Element Key from Row 1
+                    Cell headerCell = headerRow.getCell(colNum);
+                    String dataElementKey = getCellValueAsString(headerCell).trim();
+                    if (dataElementKey.isEmpty()) {
+                        continue;
                     }
 
-                    // Apply the field update using the same logic as i_create_iso_message
-                    applyBddUpdate(fieldName, sampleData, dataType);
-                    processedFields++;
-                    System.out.println("  Status: Processed successfully");
-                } catch (Exception e) {
-                    System.out.println("  Status: Failed to process - " + e.getMessage());
+                    // Get the data from current row
+                    Cell dataCell = dataRow.getCell(colNum);
+                    String sampleData = getCellValueAsString(dataCell).trim();
+                    if (sampleData.isEmpty()) {
+                        continue;
+                    }
+
+                    System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
+                    System.out.println("  Data Element Key: " + dataElementKey);
+                    System.out.println("  Sample Data: " + sampleData);
+
+                    // Determine the data type from the configuration
+                    String dataType = "String"; // Default type
+                    JsonNode config = fieldConfig.get(dataElementKey);
+                    if (config != null && config.has("type")) {
+                        dataType = config.get("type").asText();
+                    }
+                    System.out.println("  Data Type: " + dataType);
+
+                    try {
+                        // Get the field name from configuration
+                        String fieldName = "";
+                        if (config != null && config.has("name")) {
+                            fieldName = config.get("name").asText();
+                        } else {
+                            System.out.println("  Warning: No field name found in configuration for key " + dataElementKey);
+                            fieldName = "Field_" + dataElementKey; // Fallback
+                        }
+
+                        // Apply the field update using the same logic as i_create_iso_message
+                        applyBddUpdate(fieldName, sampleData, dataType);
+                        processedFields++;
+                        System.out.println("  Status: Processed successfully");
+                    } catch (Exception e) {
+                        System.out.println("  Status: Failed to process - " + e.getMessage());
+                    }
                 }
+
+                // Generate ISO message for this row
+                generateDefaultFields();
+                String isoMessage = buildIsoMessage();
+                System.out.println("\nGenerated ISO Message for Row " + (rowNum + 1) + ":");
+                System.out.println(isoMessage);
+
+                // Write the ISO message back to the spreadsheet in column CE (index 82)
+                Cell messageCell = dataRow.createCell(82);
+                messageCell.setCellValue(isoMessage);
+
+                System.out.println("Processed " + processedFields + " fields in row " + (rowNum + 1));
+
+                // Clear the fields for next row
+                isoFields.clear();
+                manuallyUpdatedFields.clear();
+                Arrays.fill(primaryBitmap, false);
+                Arrays.fill(secondaryBitmap, false);
             }
 
-            System.out.println("\n=== Processing Summary ===");
-            System.out.println("Total fields processed: " + processedFields);
-
-            // Generate default fields and build ISO message
-            generateDefaultFields();
-            String isoMessage = buildIsoMessage();
-            System.out.println("\nGenerated ISO Message:");
-            System.out.println(isoMessage);
-
-            // Write the ISO message back to the spreadsheet in column CE (index 82)
+            // Add header for the ISO message column
             Cell headerCell = headerRow.createCell(82); // Column CE
             headerCell.setCellValue("Generated ISO Message");
-
-            Cell messageCell = dataRow.createCell(82);
-            messageCell.setCellValue(isoMessage);
 
             // Save the workbook
             try (FileOutputStream fos = new FileOutputStream(filePath)) {
                 workbook.write(fos);
-                System.out.println("\nSuccessfully wrote ISO message to spreadsheet in column CE");
+                System.out.println("\nSuccessfully wrote all ISO messages to spreadsheet in column CE");
             }
         } catch (Exception e) {
             System.err.println("\nError processing spreadsheet: " + e.getMessage());
