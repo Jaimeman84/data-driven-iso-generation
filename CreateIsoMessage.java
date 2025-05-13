@@ -300,6 +300,43 @@ public class CreateIsoMessage  {
         return false;
     }
 
+    // Helper method to get cell value as string, regardless of cell type
+    private static String getCellValueAsString(Cell cell) {
+        if (cell == null) {
+            return "";
+        }
+        
+        switch (cell.getCellType()) {
+            case NUMERIC:
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    return cell.getDateCellValue().toString();
+                } else {
+                    // Convert to string and remove any decimal points and trailing zeros
+                    String numericValue = String.valueOf(cell.getNumericCellValue());
+                    if (numericValue.contains(".")) {
+                        numericValue = numericValue.replaceAll("\\.0*$", "");
+                    }
+                    return numericValue;
+                }
+            case STRING:
+                return cell.getStringCellValue();
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                try {
+                    return String.valueOf(cell.getNumericCellValue());
+                } catch (IllegalStateException e) {
+                    try {
+                        return String.valueOf(cell.getStringCellValue());
+                    } catch (IllegalStateException e2) {
+                        return cell.getCellFormula();
+                    }
+                }
+            default:
+                return "";
+        }
+    }
+
     public static void generateIsoFromSpreadsheet(String filePath) throws IOException {
         // Clear any existing field data
         isoFields.clear();
@@ -343,11 +380,7 @@ public class CreateIsoMessage  {
             for (int colNum = 1; colNum <= 81; colNum++) {
                 // Get the Data Element Key from Row 1
                 Cell headerCell = headerRow.getCell(colNum);
-                if (headerCell == null) {
-                    System.out.println("Column " + getColumnName(colNum) + ": No header found - skipping");
-                    continue;
-                }
-                String dataElementKey = headerCell.toString().trim();
+                String dataElementKey = getCellValueAsString(headerCell).trim();
                 if (dataElementKey.isEmpty()) {
                     System.out.println("Column " + getColumnName(colNum) + ": Empty header - skipping");
                     continue;
@@ -355,12 +388,7 @@ public class CreateIsoMessage  {
 
                 // Get the data from Row 4
                 Cell dataCell = dataRow.getCell(colNum);
-                if (dataCell == null || dataCell.getCellType() == CellType.BLANK) {
-                    System.out.println("Column " + getColumnName(colNum) + " (Key: " + dataElementKey + "): No data - skipping");
-                    continue;
-                }
-
-                String sampleData = dataCell.toString().trim();
+                String sampleData = getCellValueAsString(dataCell).trim();
                 if (sampleData.isEmpty()) {
                     System.out.println("Column " + getColumnName(colNum) + " (Key: " + dataElementKey + "): Empty data - skipping");
                     continue;
