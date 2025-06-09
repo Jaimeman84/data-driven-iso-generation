@@ -24,6 +24,7 @@ public class CreateIsoMessage  {
     private static boolean[] primaryBitmap = new boolean[64];
     private static boolean[] secondaryBitmap = new boolean[64];
     private static Set<String> manuallyUpdatedFields = new HashSet<>(); // Tracks modified fields
+    private static final String PARSER_URL = "enter url here"; // Replace with actual URL
 
     public void i_create_iso_message(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
@@ -262,6 +263,134 @@ public class CreateIsoMessage  {
         return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(outputJson);
     }
 
+    private static String bitmapToHex(boolean[] bitmap) {
+        StringBuilder binary = new StringBuilder();
+        for (boolean bit : bitmap) {
+            binary.append(bit ? "1" : "0");
+        }
+
+        // Convert binary string to hex
+        StringBuilder hex = new StringBuilder();
+        for (int i = 0; i < 64; i += 4) {
+            hex.append(Integer.toHexString(Integer.parseInt(binary.substring(i, i + 4), 2)).toUpperCase());
+        }
+
+        return hex.toString();
+    }
+
+    private static boolean hasActivePrimaryFields() {
+        // Check if any fields 1-64 are present
+        for (int field : isoFields.keySet()) {
+            if (field > 0 && field <= 64) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Sends an ISO8583 message to the parser service
+     * @param isoMessage The ISO8583 message to send
+     * @return The JSON response from the parser
+     */
+    public static String sendIsoMessageToParser(String isoMessage) throws IOException {
+        URL url = new URL(PARSER_URL);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/plain");
+        connection.setDoOutput(true);
+
+        // Send the request
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = isoMessage.getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        // Get response code
+        int responseCode = connection.getResponseCode();
+        StringBuilder response = new StringBuilder();
+
+        // Use error stream for 400 responses, input stream for successful responses
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(responseCode == 400 
+                        ? connection.getErrorStream()
+                        : connection.getInputStream(), "utf-8"))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        }
+
+        // For 400 responses, try to parse the error message
+        if (responseCode == 400) {
+            try {
+                JsonNode errorNode = objectMapper.readTree(response.toString());
+                if (errorNode.has("message")) {
+                    return "Error: " + errorNode.get("message").asText();
+                } else if (errorNode.has("error")) {
+                    return "Error: " + errorNode.get("error").asText();
+                }
+            } catch (Exception e) {
+                // If can't parse as JSON, return raw response with Error prefix
+                return "Error: " + response.toString();
+            }
+        }
+
+        return response.toString();
+    }
+
+    /**
+     * Sends an ISO8583 message to the canonical endpoint for validation
+     * @param isoMessage The ISO8583 message to convert to canonical form
+     * @return The canonical JSON response
+     */
+    public static String sendIsoMessageToCanonical(String isoMessage) throws IOException {
+        String CANONICAL_URL = "http://localhost:8080/iso8583/mapToCanonicalObject"; // Replace with actual URL
+        
+        URL url = new URL(CANONICAL_URL);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/plain");
+        connection.setDoOutput(true);
+
+        // Send the request
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = isoMessage.getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        // Get response code
+        int responseCode = connection.getResponseCode();
+        StringBuilder response = new StringBuilder();
+
+        // Use error stream for 400 responses, input stream for successful responses
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(responseCode == 400 
+                        ? connection.getErrorStream()
+                        : connection.getInputStream(), "utf-8"))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        }
+
+        // For 400 responses, try to parse the error message
+        if (responseCode == 400) {
+            try {
+                JsonNode errorNode = objectMapper.readTree(response.toString());
+                if (errorNode.has("message")) {
+                    return "Error: " + errorNode.get("message").asText();
+                } else if (errorNode.has("error")) {
+                    return "Error: " + errorNode.get("error").asText();
+                }
+            } catch (Exception e) {
+                return "Error: " + response.toString();
+            }
+        }
+
+        return response.toString();
+    }
+
     public static String getFieldNumberFromJsonPath(String jsonPath) {
 
             return fieldConfig.entrySet().stream()
@@ -349,7 +478,7 @@ public class CreateIsoMessage  {
     }
 
     public static void generateIsoFromSpreadsheet(String filePath) throws IOException {
-        System.out.println("\n=== Starting ISO message generation from spreadsheet ===");
+        System.out.println("\n=== Starting ISO message generation and validation from spreadsheet ===");
         System.out.println("File: " + filePath);
 
         // Load the ISO configuration
@@ -378,9 +507,11 @@ public class CreateIsoMessage  {
             int totalRows = sheet.getLastRowNum();
             System.out.println("\nProcessing rows 4 to " + (totalRows + 1));
 
-            // Create a cell for the ISO Message header in column CE
-            Cell headerCell = headerRow.createCell(82); // Column CE
-            headerCell.setCellValue("Generated ISO Message");
+            // Create headers for ISO Message and Validation Results
+            Cell isoHeaderCell = headerRow.createCell(82); // Column CE
+            isoHeaderCell.setCellValue("Generated ISO Message");
+            Cell validationHeaderCell = headerRow.createCell(83); // Column CF
+            validationHeaderCell.setCellValue("Validation Results");
 
             // Process each row starting from row 4
             for (int rowIndex = 3; rowIndex <= totalRows; rowIndex++) {
@@ -402,8 +533,8 @@ public class CreateIsoMessage  {
                 // Start from Column B (index 1) and go to Column CD (index 81)
                 for (int colNum = 1; colNum <= 81; colNum++) {
                     // Get the Data Element Key from Row 1
-                    Cell headerCell2 = headerRow.getCell(colNum);
-                    String dataElementKey = getCellValueAsString(headerCell2).trim();
+                    Cell headerCell = headerRow.getCell(colNum);
+                    String dataElementKey = getCellValueAsString(headerCell).trim();
                     if (dataElementKey.isEmpty()) {
                         continue;
                     }
@@ -456,9 +587,28 @@ public class CreateIsoMessage  {
                     System.out.println("\nGenerated ISO Message for Row " + (rowIndex + 1) + ":");
                     System.out.println(isoMessage);
 
-                    // Write the ISO message back to the spreadsheet in column CE
-                    Cell messageCell = dataRow.createCell(82);
+                    // Write the ISO message to the spreadsheet
+                    Cell messageCell = dataRow.createCell(82); // Column CE
                     messageCell.setCellValue(isoMessage);
+
+                    try {
+                        // Validate against canonical form
+                        ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, dataRow);
+                        validationResult.printResults();
+
+                        // Write validation results to the spreadsheet
+                        Cell validationCell = dataRow.createCell(83); // Column CF
+                        String validationSummary = String.format(
+                            "Passed: %d, Failed: %d", 
+                            validationResult.getResults().values().stream().filter(FieldResult::isPassed).count(),
+                            validationResult.getResults().values().stream().filter(r -> !r.isPassed()).count()
+                        );
+                        validationCell.setCellValue(validationSummary);
+                    } catch (Exception e) {
+                        System.out.println("\nValidation failed: " + e.getMessage());
+                        Cell validationCell = dataRow.createCell(83);
+                        validationCell.setCellValue("Validation Error: " + e.getMessage());
+                    }
                 } else {
                     System.out.println("\nNo fields processed for Row " + (rowIndex + 1) + " - skipping ISO message generation");
                 }
@@ -467,7 +617,7 @@ public class CreateIsoMessage  {
             // Save the workbook
             try (FileOutputStream fos = new FileOutputStream(filePath)) {
                 workbook.write(fos);
-                System.out.println("\nSuccessfully wrote all ISO messages to spreadsheet in column CE");
+                System.out.println("\nSuccessfully wrote all ISO messages and validation results to spreadsheet");
             }
         } catch (Exception e) {
             System.err.println("\nError processing spreadsheet: " + e.getMessage());
@@ -485,6 +635,172 @@ public class CreateIsoMessage  {
             colNum = (colNum / 26) - 1;
         }
         return columnName.toString();
+    }
+
+    /**
+     * Gets the canonical path(s) for a given DE from the config
+     * @param de The data element number
+     * @return List of canonical paths for this DE
+     */
+    private static List<String> getCanonicalPaths(String de) {
+        JsonNode config = fieldConfig.get(de);
+        if (config != null && config.has("canonical")) {
+            List<String> paths = new ArrayList<>();
+            JsonNode canonical = config.get("canonical");
+            if (canonical.isArray()) {
+                canonical.forEach(path -> paths.add(path.asText()));
+            }
+            return paths;
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Validates an ISO message against its canonical form
+     * @param isoMessage The ISO message to validate
+     * @param excelRow The row containing expected values
+     * @return ValidationResult containing pass/fail details
+     */
+    public static ValidationResult validateIsoMessageCanonical(String isoMessage, Row excelRow) throws IOException {
+        ValidationResult result = new ValidationResult();
+        
+        // Get canonical response
+        String canonicalResponse = sendIsoMessageToCanonical(isoMessage);
+        JsonNode canonicalJson = objectMapper.readTree(canonicalResponse);
+        
+        // Extract values from Excel row
+        Map<String, String> deValues = extractDEValuesFromExcel(excelRow);
+        
+        // Validate each field
+        for (Map.Entry<String, String> entry : deValues.entrySet()) {
+            String de = entry.getKey();
+            String expectedValue = entry.getValue();
+            
+            List<String> canonicalPaths = getCanonicalPaths(de);
+            if (!canonicalPaths.isEmpty()) {
+                boolean foundMatch = false;
+                for (String jsonPath : canonicalPaths) {
+                    // Skip comments or placeholder paths
+                    if (jsonPath.contains("-->") || jsonPath.startsWith("Tag :") || 
+                        jsonPath.contains("Need to discuss") || jsonPath.contains("not canonicalize")) {
+                        continue;
+                    }
+                    
+                    JsonNode actualNode = getValueFromJsonPath(canonicalJson, jsonPath.trim());
+                    if (actualNode != null) {
+                        String actualValue = actualNode.asText();
+                        if (expectedValue.equals(actualValue)) {
+                            result.addPassedField(de, expectedValue, actualValue);
+                            foundMatch = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!foundMatch) {
+                    // If we tried all paths and none matched, record as a failure
+                    result.addFailedField(de, expectedValue, "No matching value found in canonical paths: " + String.join(", ", canonicalPaths));
+                }
+            } else {
+                result.addFailedField(de, expectedValue, "No canonical mapping found for DE " + de);
+            }
+        }
+        
+        return result;
+    }
+
+    /**
+     * Extracts DE values from an Excel row
+     */
+    private static Map<String, String> extractDEValuesFromExcel(Row row) {
+        Map<String, String> deValues = new HashMap<>();
+        Row headerRow = row.getSheet().getRow(0);
+        
+        for (int colNum = 1; colNum <= 81; colNum++) {
+            Cell headerCell = headerRow.getCell(colNum);
+            Cell dataCell = row.getCell(colNum);
+            
+            if (headerCell != null && dataCell != null) {
+                String de = getCellValueAsString(headerCell).trim();
+                String value = getCellValueAsString(dataCell).trim();
+                
+                if (!de.isEmpty() && !value.isEmpty()) {
+                    deValues.put(de, value);
+                }
+            }
+        }
+        
+        return deValues;
+    }
+
+    /**
+     * Gets a value from a JSON node using a dot-notation path
+     */
+    private static JsonNode getValueFromJsonPath(JsonNode rootNode, String path) {
+        String[] parts = path.split("\\.");
+        JsonNode current = rootNode;
+        
+        for (String part : parts) {
+            current = current.path(part);
+            if (current.isMissingNode()) {
+                return null;
+            }
+        }
+        
+        return current;
+    }
+
+    /**
+     * Class to hold validation results
+     */
+    public static class ValidationResult {
+        private final Map<String, FieldResult> results = new HashMap<>();
+        
+        public void addPassedField(String de, String expected, String actual) {
+            results.put(de, new FieldResult(true, expected, actual));
+        }
+        
+        public void addFailedField(String de, String expected, String actual) {
+            results.put(de, new FieldResult(false, expected, actual));
+        }
+        
+        public Map<String, FieldResult> getResults() {
+            return results;
+        }
+        
+        public boolean isAllPassed() {
+            return results.values().stream().allMatch(FieldResult::isPassed);
+        }
+        
+        public void printResults() {
+            System.out.println("\n=== Validation Results ===");
+            results.forEach((de, result) -> {
+                System.out.printf("DE %s: %s%n", de, result.isPassed() ? "PASS" : "FAIL");
+                if (!result.isPassed()) {
+                    System.out.printf("  Expected: %s%n  Actual: %s%n", 
+                        result.getExpected(), result.getActual());
+                }
+            });
+        }
+    }
+    
+    /**
+     * Class to hold individual field validation results
+     */
+    public static class FieldResult {
+        private final boolean passed;
+        private final String expected;
+        private final String actual;
+        
+        public FieldResult(boolean passed, String expected, String actual) {
+            this.passed = passed;
+            this.expected = expected;
+            this.actual = actual;
+        }
+        
+        public boolean isPassed() { return passed; }
+        public String getExpected() { return expected; }
+        public String getActual() { return actual; }
     }
 
 }
