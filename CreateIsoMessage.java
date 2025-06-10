@@ -667,6 +667,10 @@ public class CreateIsoMessage  {
         
         // Get canonical response
         String canonicalResponse = sendIsoMessageToCanonical(isoMessage);
+        System.out.println("\nDEBUG - Canonical Response received:");
+        System.out.println(canonicalResponse);
+        
+        // Parse the canonical response once
         JsonNode canonicalJson = objectMapper.readTree(canonicalResponse);
         
         // Extract values from Excel row
@@ -680,6 +684,12 @@ public class CreateIsoMessage  {
             // Skip validation for non-canonicalized fields
             if (isNonCanonicalized(de)) {
                 result.addSkippedField(de, expectedValue, getSkipReason(de));
+                continue;
+            }
+
+            // Special handling for DE 43 (Merchant Location)
+            if (de.equals("43")) {
+                validateMerchantLocation(de, expectedValue, canonicalJson, result);
                 continue;
             }
 
@@ -954,16 +964,10 @@ public class CreateIsoMessage  {
     /**
      * Validates DE 43 merchant location field by parsing its sub-elements
      */
-    private static boolean validateMerchantLocation(String de, String expected, String actual, ValidationResult result) {
+    private static boolean validateMerchantLocation(String de, String expected, JsonNode canonicalJson, ValidationResult result) {
         try {
             System.out.println("\nDEBUG - DE 43 Validation:");
             System.out.println("Raw ISO value: [" + expected + "]");
-            System.out.println("Raw Canonical response: " + actual);
-
-            // First validate that we have a proper JSON response
-            if (!actual.startsWith("{")) {
-                throw new IllegalArgumentException("Canonical response is not in JSON format: " + actual);
-            }
 
             // Ensure the expected value is padded to full length if shorter
             String paddedExpected = String.format("%-40s", expected).substring(0, 40);
@@ -980,21 +984,11 @@ public class CreateIsoMessage  {
             System.out.println("State (37-38): [" + state + "]");
             System.out.println("Country (39-40): [" + country + "]");
 
-            // Parse the actual (canonical) JSON response
-            JsonNode actualJson;
-            try {
-                actualJson = objectMapper.readTree(actual);
-            } catch (Exception e) {
-                System.out.println("Error parsing canonical JSON response: " + e.getMessage());
-                System.out.println("Canonical response received: " + actual);
-                throw new IllegalArgumentException("Invalid JSON in canonical response", e);
-            }
-            
             // Extract values from canonical format
-            String actualAddress = getJsonValue(actualJson, "transaction.merchant.address.addressLine1");
-            String actualCity = getJsonValue(actualJson, "transaction.merchant.address.city");
-            String actualState = getJsonValue(actualJson, "transaction.merchant.address.state");
-            String actualCountry = getJsonValue(actualJson, "transaction.merchant.address.country.countryCode");
+            String actualAddress = getJsonValue(canonicalJson, "transaction.merchant.address.addressLine1");
+            String actualCity = getJsonValue(canonicalJson, "transaction.merchant.address.city");
+            String actualState = getJsonValue(canonicalJson, "transaction.merchant.address.state");
+            String actualCountry = getJsonValue(canonicalJson, "transaction.merchant.address.country.countryCode");
 
             System.out.println("\nCanonical values:");
             System.out.println("Address: [" + actualAddress + "]");
@@ -1036,8 +1030,6 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             System.out.println("\nERROR processing DE 43: " + e.getMessage());
-            System.out.println("Expected (ISO) value: " + expected);
-            System.out.println("Actual (Canonical) value: " + actual);
             e.printStackTrace();
             result.addFailedField(de, expected,
                 "Failed to validate merchant location: " + e.getMessage());
