@@ -28,16 +28,18 @@
   },
   "2": {
     "name": "Primary Account Number (PAN)",
-    "canonical": [
-      "card.pan"
-    ],
+    "canonical": [],
     "format": "llvar",
     "type": "numeric",
     "length": null,
     "notes": "Should be validated using Luhn's check (mod 10). Must be encrypted and tokenized if present. Required for manually entered PANs or when track data is not available.",
     "max_length": 19,
     "active": false,
-    "SampleData": "5314451120000000"
+    "SampleData": "5314451120000000",
+    "validation": {
+      "skip": true,
+      "reason": "PAN is not canonicalized for security reasons"
+    }
   },
   "3": {
     "name": "Processing Code",
@@ -61,7 +63,14 @@
     "length": 12,
     "notes": "Represents the transaction amount in fixed length, padded with zeros. Last 2 digits represent decimal places.",
     "active": false,
-    "SampleData": "000000020000"
+    "SampleData": "000000020000",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true,
+        "handleDecimals": true
+      }
+    }
   },
   "5": {
     "name": "Amount, Settlement",
@@ -97,7 +106,14 @@
     "length": 10,
     "notes": "Format: MMDDhhmmss. Must be a valid date and time expressed in GMT.",
     "active": false,
-    "SampleData": "0329150405"
+    "SampleData": "0329150405",
+    "validation": {
+      "type": "datetime",
+      "format": {
+        "input": "MMDDhhmmss",
+        "canonical": "YYYY-MM-DDThh:mm:ssZ"
+      }
+    }
   },
   "8": {
     "name": "Amount, Cardholder Billing Fee",
@@ -887,21 +903,29 @@
   },
   "35": {
     "name": "Track 2 Data",
+    "canonical": [],
     "format": "llvar",
     "max_length": 37,
     "type": "alphanumeric",
     "active": false,
     "SampleData": ";5314451120000000=2812221711760?",
-    "notes": "Required if DE 22 value is 02 or 06. Not applicable for manual entry transactions."
+    "validation": {
+      "skip": true,
+      "reason": "Track data is not canonicalized for security reasons"
+    }
   },
   "45": {
     "name": "Track 1 Data",
+    "canonical": [],
     "format": "llvar",
     "max_length": 76,
     "type": "alphanumeric",
     "active": false,
     "SampleData": "12T1D525MAX076",
-    "notes": "Not expected for MVP. Ignore if received."
+    "validation": {
+      "skip": true,
+      "reason": "Track data is not canonicalized for security reasons"
+    }
   },
   "47": {
     "name": "Additional Data National",

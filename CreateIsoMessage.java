@@ -676,6 +676,12 @@ public class CreateIsoMessage  {
             String de = entry.getKey();
             String expectedValue = entry.getValue();
             
+            // Skip validation for non-canonicalized fields
+            if (isNonCanonicalized(de)) {
+                result.addSkippedField(de, expectedValue, getSkipReason(de));
+                continue;
+            }
+
             List<String> canonicalPaths = getCanonicalPaths(de);
             if (!canonicalPaths.isEmpty()) {
                 boolean foundMatch = false;
@@ -689,8 +695,9 @@ public class CreateIsoMessage  {
                     JsonNode actualNode = getValueFromJsonPath(canonicalJson, jsonPath.trim());
                     if (actualNode != null) {
                         String actualValue = actualNode.asText();
-                        if (expectedValue.equals(actualValue)) {
-                            result.addPassedField(de, expectedValue, actualValue);
+                        
+                        // Apply specialized validation based on DE
+                        if (validateSpecialCase(de, expectedValue, actualValue, result)) {
                             foundMatch = true;
                             break;
                         }
@@ -698,8 +705,8 @@ public class CreateIsoMessage  {
                 }
                 
                 if (!foundMatch) {
-                    // If we tried all paths and none matched, record as a failure
-                    result.addFailedField(de, expectedValue, "No matching value found in canonical paths: " + String.join(", ", canonicalPaths));
+                    result.addFailedField(de, expectedValue, 
+                        "No matching value found in canonical paths: " + String.join(", ", canonicalPaths));
                 }
             } else {
                 result.addFailedField(de, expectedValue, "No canonical mapping found for DE " + de);
@@ -707,6 +714,124 @@ public class CreateIsoMessage  {
         }
         
         return result;
+    }
+
+    /**
+     * Checks if a DE should not be canonicalized based on config
+     */
+    private static boolean isNonCanonicalized(String de) {
+        JsonNode config = fieldConfig.get(de);
+        if (config != null && config.has("validation")) {
+            JsonNode validation = config.get("validation");
+            return validation.has("skip") && validation.get("skip").asBoolean();
+        }
+        return false;
+    }
+
+    /**
+     * Gets the validation reason for skipped fields
+     */
+    private static String getSkipReason(String de) {
+        JsonNode config = fieldConfig.get(de);
+        if (config != null && config.has("validation")) {
+            JsonNode validation = config.get("validation");
+            if (validation.has("reason")) {
+                return validation.get("reason").asText();
+            }
+        }
+        return "Field is not canonicalized";
+    }
+
+    /**
+     * Handles special validation cases for specific DEs based on config
+     */
+    private static boolean validateSpecialCase(String de, String expected, String actual, ValidationResult result) {
+        JsonNode config = fieldConfig.get(de);
+        if (config != null && config.has("validation")) {
+            JsonNode validation = config.get("validation");
+            if (validation.has("type")) {
+                String validationType = validation.get("type").asText();
+                switch (validationType) {
+                    case "amount":
+                        return validateAmount(de, expected, actual, result, validation.get("rules"));
+                    case "datetime":
+                        return validateDateTime(de, expected, actual, result, validation.get("format"));
+                }
+            }
+        }
+
+        // Default comparison for fields without special validation
+        if (expected.equals(actual)) {
+            result.addPassedField(de, expected, actual);
+            return true;
+        }
+        result.addFailedField(de, expected, actual);
+        return false;
+    }
+
+    /**
+     * Validates amount fields using config rules
+     */
+    private static boolean validateAmount(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        String normalizedExpected = expected;
+        String normalizedActual = actual;
+
+        if (rules.has("removeLeadingZeros") && rules.get("removeLeadingZeros").asBoolean()) {
+            normalizedExpected = String.valueOf(Long.parseLong(expected));
+        }
+
+        if (rules.has("handleDecimals") && rules.get("handleDecimals").asBoolean()) {
+            normalizedActual = actual.replace(".", "").replaceAll("\\.?0*$", "");
+        }
+
+        if (normalizedExpected.equals(normalizedActual)) {
+            result.addPassedField(de, expected, actual + " (Normalized: " + normalizedExpected + ")");
+            return true;
+        }
+
+        result.addFailedField(de, expected + " (Normalized: " + normalizedExpected + ")",
+                actual + " (Normalized: " + normalizedActual + ")");
+        return false;
+    }
+
+    /**
+     * Validates datetime fields using config format
+     */
+    private static boolean validateDateTime(String de, String expected, String actual, ValidationResult result, JsonNode format) {
+        try {
+            String inputFormat = format.get("input").asText();
+            String canonicalFormat = format.get("canonical").asText();
+
+            // Parse the input format (MMDDhhmmss)
+            String month = expected.substring(0, 2);
+            String day = expected.substring(2, 4);
+            String hour = expected.substring(4, 6);
+            String minute = expected.substring(6, 8);
+            String second = expected.substring(8, 10);
+
+            // Get current year
+            int year = Calendar.getInstance().get(Calendar.YEAR);
+
+            // Create expected datetime string
+            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
+                year, month, day, hour, minute, second);
+
+            // Compare ignoring timezone
+            if (actual.startsWith(expectedDateTime)) {
+                result.addPassedField(de, expected, actual + 
+                    String.format(" (Converted from %s to %s)", inputFormat, canonicalFormat));
+                return true;
+            }
+
+            result.addFailedField(de, expected + 
+                String.format(" (Expected %s format: %s)", canonicalFormat, expectedDateTime), actual);
+            return false;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected,
+                actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+            return false;
+        }
     }
 
     /**
@@ -762,6 +887,10 @@ public class CreateIsoMessage  {
         
         public void addFailedField(String de, String expected, String actual) {
             results.put(de, new FieldResult(false, expected, actual));
+        }
+        
+        public void addSkippedField(String de, String expected, String reason) {
+            results.put(de, new FieldResult(false, expected, reason));
         }
         
         public Map<String, FieldResult> getResults() {
