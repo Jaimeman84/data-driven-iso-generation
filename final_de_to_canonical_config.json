@@ -219,6 +219,7 @@
     "format": "unknown",
     "type": "alphanumeric",
     "length": null,
+    "active": false,
     "notes": ""
   },
   "17": {
@@ -484,6 +485,7 @@
     "format": "unknown",
     "type": "alphanumeric",
     "length": null,
+    "active": false,
     "notes": ""
   },
   "46": {
@@ -584,6 +586,7 @@
     "format": "unknown",
     "type": "alphanumeric",
     "length": null,
+    "active": false,
     "notes": ""
   },
   "57": {
@@ -693,6 +696,7 @@
     "format": "unknown",
     "type": "alphanumeric",
     "length": null,
+    "active": false,
     "notes": ""
   },
   "90": {
