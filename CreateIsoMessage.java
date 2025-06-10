@@ -1126,48 +1126,32 @@ public class CreateIsoMessage  {
 
         public void printResults() {
             System.out.println("\n=== Validation Results ===");
-            System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s", 
-                "DE", "Status", "ISO Value", "Canonical Value", "Mapping"));
-            System.out.println("-".repeat(120));
+            System.out.println(String.format("%-6s | %-15s | %-40s | %-40s", 
+                "DE", "Status", "ISO Value", "Canonical Value"));
+            System.out.println("-".repeat(110));
             
             // Sort the results by DE number for consistent display
             new TreeMap<>(results).forEach((de, result) -> {
                 try {
-                    JsonNode config = fieldConfig.get(de);
-                    List<String> paths = new ArrayList<>();
-                    if (config != null && config.has("canonical")) {
-                        JsonNode canonical = config.get("canonical");
-                        if (canonical.isArray()) {
-                            canonical.forEach(path -> {
-                                if (path != null) {
-                                    paths.add(path.asText());
-                                }
-                            });
-                        }
-                    }
-                    String canonicalPath = paths.isEmpty() ? "No mapping" : String.join(", ", paths);
-
                     // Format ISO value to show original value and any paired values
                     String isoValue = formatIsoValue(de, result);
                     
                     // Format canonical value with any relevant conversion info
                     String canonicalValue = formatCanonicalValue(de, result);
                     
-                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
+                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s",
                         de,
                         result.getStatus().toString(),
                         truncateOrPad(isoValue, 40),
-                        truncateOrPad(canonicalValue, 40),
-                        canonicalPath
+                        truncateOrPad(canonicalValue, 40)
                     ));
                 } catch (Exception e) {
                     // If there's an error formatting a specific row, print it with error info
-                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
+                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s",
                         de,
                         "ERROR",
                         "Error formatting result",
-                        e.getMessage(),
-                        "Error"
+                        e.getMessage()
                     ));
                 }
             });
