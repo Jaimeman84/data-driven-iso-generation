@@ -1101,14 +1101,18 @@ public class CreateIsoMessage  {
                     // For paired datetime fields
                     if (validation.has("format") && validation.get("format").has("pairedField")) {
                         JsonNode paired = validation.get("format").get("pairedField");
-                        String otherField = paired.get("field").asText();
                         String fieldType = paired.get("type").asText();
+                        String value = result.getExpected();
                         
-                        // Show only the relevant part (date or time) based on the field type
+                        // Extract only the relevant portion based on field type
                         if ("date".equals(fieldType)) {
-                            return String.format("%s (Date component)", result.getExpected());
+                            // For date field (DE 13), show only MMDD
+                            String dateComponent = value.length() >= 4 ? value.substring(0, 4) : value;
+                            return String.format("%s (Date component)", dateComponent);
                         } else if ("time".equals(fieldType)) {
-                            return String.format("%s (Time component)", result.getExpected());
+                            // For time field (DE 12), show only HHMMSS
+                            String timeComponent = value.length() >= 6 ? value.substring(value.length() - 6) : value;
+                            return String.format("%s (Time component)", timeComponent);
                         }
                     }
                     
