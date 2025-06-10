@@ -304,7 +304,10 @@
     "length": 3,
     "notes": "Indicates how card data was captured. Examples: 01X - Manual entry, 02X - Card swipe, 06X - Card swipe with PIN, 09X - eCommerce.",
     "active": false,
-    "SampleData": "002"
+    "SampleData": "020",
+    "validation": {
+      "type": "pos_entry_mode"
+    }
   },
   "23": {
     "name": "Card Sequence Number",

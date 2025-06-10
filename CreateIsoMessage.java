@@ -782,7 +782,6 @@ public class CreateIsoMessage  {
                     case "amount":
                         return validateAmount(de, expected, actual, result, validation.get("rules"));
                     case "datetime":
-                        // For datetime validation, we need the actual value from the canonical response
                         try {
                             JsonNode actualJson = objectMapper.readTree(actual);
                             String actualValue = getJsonValue(actualJson, getCanonicalPaths(de).get(0));
@@ -801,6 +800,8 @@ public class CreateIsoMessage  {
                             result.addFailedField(de, expected, "Failed to parse canonical response: " + e.getMessage());
                             return false;
                         }
+                    case "pos_entry_mode":
+                        return validatePosEntryMode(de, expected, actual, result);
                 }
             }
         }
@@ -818,25 +819,50 @@ public class CreateIsoMessage  {
      * Validates amount fields using config rules
      */
     private static boolean validateAmount(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
-        String normalizedExpected = expected;
-        String normalizedActual = actual;
+        try {
+            // Parse the canonical JSON response
+            JsonNode actualJson = objectMapper.readTree(actual);
+            String actualValue = getJsonValue(actualJson, getCanonicalPaths(de).get(0));
 
-        if (rules.has("removeLeadingZeros") && rules.get("removeLeadingZeros").asBoolean()) {
-            normalizedExpected = String.valueOf(Long.parseLong(expected));
+            String normalizedExpected = expected;
+            String normalizedActual = actualValue;
+
+            // Remove leading zeros if configured
+            if (rules.has("removeLeadingZeros") && rules.get("removeLeadingZeros").asBoolean()) {
+                normalizedExpected = String.valueOf(Long.parseLong(expected));
+            }
+
+            // Handle decimals if configured
+            if (rules.has("handleDecimals") && rules.get("handleDecimals").asBoolean()) {
+                // For ISO value: last two digits are decimal places
+                if (normalizedExpected.length() >= 2) {
+                    String mainPart = normalizedExpected.substring(0, normalizedExpected.length() - 2);
+                    String decimalPart = normalizedExpected.substring(normalizedExpected.length() - 2);
+                    normalizedExpected = mainPart + "." + decimalPart;
+                    // Remove trailing zeros after decimal
+                    normalizedExpected = normalizedExpected.replaceAll("\\.?0*$", "");
+                }
+
+                // For canonical value: remove decimal point and trailing zeros
+                normalizedActual = normalizedActual.replace(".", "").replaceAll("\\.?0*$", "");
+            }
+
+            if (normalizedExpected.equals(normalizedActual)) {
+                result.addPassedField(de, expected, actualValue + 
+                    String.format(" (Normalized: %s)", normalizedExpected));
+                return true;
+            }
+
+            result.addFailedField(de, expected + 
+                String.format(" (Normalized: %s)", normalizedExpected),
+                actualValue + String.format(" (Normalized: %s)", normalizedActual));
+            return false;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected,
+                "Failed to validate amount: " + e.getMessage());
+            return false;
         }
-
-        if (rules.has("handleDecimals") && rules.get("handleDecimals").asBoolean()) {
-            normalizedActual = actual.replace(".", "").replaceAll("\\.?0*$", "");
-        }
-
-        if (normalizedExpected.equals(normalizedActual)) {
-            result.addPassedField(de, expected, actual + " (Normalized: " + normalizedExpected + ")");
-            return true;
-        }
-
-        result.addFailedField(de, expected + " (Normalized: " + normalizedExpected + ")",
-                actual + " (Normalized: " + normalizedActual + ")");
-        return false;
     }
 
     /**
@@ -1329,6 +1355,45 @@ public class CreateIsoMessage  {
         public FieldStatus getStatus() { return status; }
         public String getExpected() { return expected; }
         public String getActual() { return actual; }
+    }
+
+    /**
+     * Validates DE 22 (Point of Service Entry Mode) and maps to canonical values
+     */
+    private static boolean validatePosEntryMode(String de, String expected, String actual, ValidationResult result) {
+        try {
+            JsonNode actualJson = objectMapper.readTree(actual);
+            String actualValue = getJsonValue(actualJson, "transaction.channel.channelType");
+            
+            // Determine expected canonical value based on ISO value
+            String expectedCanonical;
+            switch (expected) {
+                case "020":
+                case "022":
+                case "029":
+                case "060":
+                    expectedCanonical = "POS";
+                    break;
+                case "010":
+                case "012":
+                case "091":
+                    expectedCanonical = "ONLINE";
+                    break;
+                default:
+                    expectedCanonical = expected; // Keep original for unmatched values
+            }
+            
+            if (expectedCanonical.equals(actualValue)) {
+                result.addPassedField(de, expected, actualValue);
+                return true;
+            } else {
+                result.addFailedField(de, expected, actualValue);
+                return false;
+            }
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to validate POS entry mode: " + e.getMessage());
+            return false;
+        }
     }
 
 }
