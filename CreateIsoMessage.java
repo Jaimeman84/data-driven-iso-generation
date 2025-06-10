@@ -824,38 +824,16 @@ public class CreateIsoMessage  {
             JsonNode actualJson = objectMapper.readTree(actual);
             String actualValue = getJsonValue(actualJson, getCanonicalPaths(de).get(0));
 
-            String normalizedExpected = expected;
+            // Remove leading zeros from expected value
+            String normalizedExpected = String.valueOf(Long.parseLong(expected));
             String normalizedActual = actualValue;
 
-            // Remove leading zeros if configured
-            if (rules.has("removeLeadingZeros") && rules.get("removeLeadingZeros").asBoolean()) {
-                normalizedExpected = String.valueOf(Long.parseLong(expected));
-            }
-
-            // Handle decimals if configured
-            if (rules.has("handleDecimals") && rules.get("handleDecimals").asBoolean()) {
-                // For ISO value: last two digits are decimal places
-                if (normalizedExpected.length() >= 2) {
-                    String mainPart = normalizedExpected.substring(0, normalizedExpected.length() - 2);
-                    String decimalPart = normalizedExpected.substring(normalizedExpected.length() - 2);
-                    normalizedExpected = mainPart + "." + decimalPart;
-                    // Remove trailing zeros after decimal
-                    normalizedExpected = normalizedExpected.replaceAll("\\.?0*$", "");
-                }
-
-                // For canonical value: remove decimal point and trailing zeros
-                normalizedActual = normalizedActual.replace(".", "").replaceAll("\\.?0*$", "");
-            }
-
             if (normalizedExpected.equals(normalizedActual)) {
-                result.addPassedField(de, expected, actualValue + 
-                    String.format(" (Normalized: %s)", normalizedExpected));
+                result.addPassedField(de, expected, actualValue);
                 return true;
             }
 
-            result.addFailedField(de, expected + 
-                String.format(" (Normalized: %s)", normalizedExpected),
-                actualValue + String.format(" (Normalized: %s)", normalizedActual));
+            result.addFailedField(de, expected, actualValue);
             return false;
 
         } catch (Exception e) {
@@ -990,29 +968,29 @@ public class CreateIsoMessage  {
      */
     private static boolean validateCurrency(String de, String expected, String actual, ValidationResult result, JsonNode format) {
         try {
-            String inputFormat = format.get("input").asText();
-            String canonicalFormat = format.get("canonical").asText();
-            JsonNode mapping = format.get("mapping");
+            // Parse the canonical JSON response
+            JsonNode actualJson = objectMapper.readTree(actual);
+            String actualValue = getJsonValue(actualJson, getCanonicalPaths(de).get(0));
 
-            // Convert numeric code to ISO if needed
-            String expectedISO = expected;
-            if ("numeric".equals(inputFormat) && "ISO".equals(canonicalFormat)) {
-                expectedISO = mapping.has(expected) ? mapping.get(expected).asText() : expected;
+            // For numeric format, we want to compare the numeric codes directly
+            if ("numeric".equals(format.get("input").asText())) {
+                // Remove any leading zeros from expected value
+                String normalizedExpected = String.valueOf(Integer.parseInt(expected));
+                String normalizedActual = actualValue;
+
+                if (normalizedExpected.equals(normalizedActual)) {
+                    result.addPassedField(de, expected, actualValue);
+                    return true;
+                }
+                result.addFailedField(de, expected, actualValue);
+                return false;
             }
 
-            if (actual.equals(expectedISO)) {
-                result.addPassedField(de, expected, actual + 
-                    String.format(" (Converted from %s to %s format)", inputFormat, canonicalFormat));
-                return true;
-            }
-
-            result.addFailedField(de, expected + 
-                String.format(" (Expected %s format: %s)", canonicalFormat, expectedISO), actual);
+            result.addFailedField(de, expected, "Unsupported currency format");
             return false;
-
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                actual + " (Failed to validate currency: " + e.getMessage() + ")");
+                "Failed to validate currency: " + e.getMessage());
             return false;
         }
     }
