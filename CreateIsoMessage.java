@@ -782,7 +782,15 @@ public class CreateIsoMessage  {
                     case "amount":
                         return validateAmount(de, expected, actual, result, validation.get("rules"));
                     case "datetime":
-                        return validateDateTime(de, expected, actual, result, validation.get("format"));
+                        // For datetime validation, we need the actual value from the canonical response
+                        try {
+                            JsonNode actualJson = objectMapper.readTree(actual);
+                            String actualValue = getJsonValue(actualJson, getCanonicalPaths(de).get(0));
+                            return validateDateTime(de, expected, actualValue, result, validation.get("format"));
+                        } catch (Exception e) {
+                            result.addFailedField(de, expected, "Failed to parse datetime from canonical response: " + e.getMessage());
+                            return false;
+                        }
                     case "currency":
                         return validateCurrency(de, expected, actual, result, validation.get("format"));
                     case "merchant_location":
@@ -790,7 +798,6 @@ public class CreateIsoMessage  {
                             JsonNode actualJson = objectMapper.readTree(actual);
                             return validateMerchantLocation(de, expected, actualJson, result);
                         } catch (Exception e) {
-                            System.out.println("Error parsing JSON in validateSpecialCase: " + e.getMessage());
                             result.addFailedField(de, expected, "Failed to parse canonical response: " + e.getMessage());
                             return false;
                         }
