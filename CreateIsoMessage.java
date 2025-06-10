@@ -1104,16 +1104,11 @@ public class CreateIsoMessage  {
                         String otherField = paired.get("field").asText();
                         String fieldType = paired.get("type").asText();
                         
-                        // Show both values that make up the datetime
-                        String otherValue = isoFields.get(Integer.parseInt(otherField));
-                        if (otherValue != null) {
-                            if ("date".equals(fieldType)) {
-                                return String.format("%s (Date: %s, Time: %s)", 
-                                    result.getExpected(), result.getExpected(), otherValue);
-                            } else {
-                                return String.format("%s (Date: %s, Time: %s)", 
-                                    result.getExpected(), otherValue, result.getExpected());
-                            }
+                        // Show only the relevant part (date or time) based on the field type
+                        if ("date".equals(fieldType)) {
+                            return String.format("%s (Date component)", result.getExpected());
+                        } else if ("time".equals(fieldType)) {
+                            return String.format("%s (Time component)", result.getExpected());
                         }
                     }
                     
@@ -1142,7 +1137,15 @@ public class CreateIsoMessage  {
                 try {
                     // For paired datetime fields
                     if (validation.has("format") && validation.get("format").has("pairedField")) {
-                        return result.getActual() + " (Combined datetime)";
+                        JsonNode paired = validation.get("format").get("pairedField");
+                        String fieldType = paired.get("type").asText();
+                        
+                        // Show which component this field contributed to the combined datetime
+                        if ("date".equals(fieldType)) {
+                            return result.getActual() + " (Combined with DE 12 for full datetime)";
+                        } else if ("time".equals(fieldType)) {
+                            return result.getActual() + " (Combined with DE 13 for full datetime)";
+                        }
                     }
                     
                     // For currency codes
