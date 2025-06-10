@@ -17,17 +17,21 @@ import java.math.BigDecimal;
 import static utilities.CustomTestData.generateCustomValue;
 import static utilities.CustomTestData.generateRandomText;
 
-public class CreateIsoMessage  {
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static Map<String, JsonNode> fieldConfig;
-    private static Map<Integer, String> isoFields = new TreeMap<>();
-    private static boolean[] primaryBitmap = new boolean[64];
-    private static boolean[] secondaryBitmap = new boolean[64];
-    private static Set<String> manuallyUpdatedFields = new HashSet<>(); // Tracks modified fields
-    private static final String PARSER_URL = "enter url here"; // Replace with actual URL
+public class CreateIsoMessage {
+    private final IsoMessageConfig config;
+    private final IsoMessageBuilder builder;
+    private final IsoMessageValidator validator;
+    private final IsoCanonicalService canonicalService;
+
+    public CreateIsoMessage() {
+        this.config = new IsoMessageConfig();
+        this.canonicalService = new IsoCanonicalService("http://localhost:8080/iso8583/mapToCanonicalObject");
+        this.builder = new IsoMessageBuilder(config);
+        this.validator = new IsoMessageValidator(config, canonicalService);
+    }
 
     public void i_create_iso_message(String requestName, DataTable dt) throws IOException {
-        loadConfig("iso_config.json");
+        config.loadConfig("iso_config.json");
 
         List<Map<String, String>> rows = dt.asMaps(String.class, String.class);
         for (Map<String, String> row : rows) {
@@ -38,19 +42,151 @@ public class CreateIsoMessage  {
             applyBddUpdate(jsonPath, value, dataType);
         }
 
-        // Generate default fields, ensuring Primary Bitmap is correct
+        // Generate default fields
         generateDefaultFields();
 
         // Build ISO message & JSON output
-        String isoMessage = buildIsoMessage();
-        String jsonOutput = buildJsonMessage();
-
+        String isoMessage = builder.buildMessage();
+        
         // Print Outputs
         System.out.println("Generated ISO8583 Message:");
         System.out.println(isoMessage);
-        System.out.println("\nGenerated JSON Output:");
-        System.out.println(jsonOutput);
+    }
 
+    public void generateIsoFromSpreadsheet(String filePath) throws IOException {
+        System.out.println("\n=== Starting ISO message generation and validation from spreadsheet ===");
+        System.out.println("File: " + filePath);
+
+        // Load the ISO configuration
+        config.loadConfig("iso_config.json");
+
+        try (FileInputStream fis = new FileInputStream(filePath);
+             Workbook workbook = new XSSFWorkbook(fis)) {
+            
+            Sheet sheet = workbook.getSheetAt(0);
+            processSheet(sheet, filePath);
+        } catch (Exception e) {
+            System.err.println("\nError processing spreadsheet: " + e.getMessage());
+            e.printStackTrace();
+            throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
+        }
+    }
+
+    private void processSheet(Sheet sheet, String filePath) throws IOException {
+        String sheetName = sheet.getSheetName();
+        System.out.println("Found worksheet: " + sheetName);
+        
+        if (!"Auth STIP Integration".equals(sheetName)) {
+            System.out.println("Warning: Expected sheet name 'Auth STIP Integration' but found '" + sheetName + "'");
+            System.out.println("Proceeding with processing anyway...");
+        }
+
+        Row headerRow = sheet.getRow(0);
+        if (headerRow == null) {
+            throw new IOException("Header row (Row 1) not found in spreadsheet");
+        }
+
+        // Create headers
+        createHeaders(headerRow);
+
+        // Process rows
+        int totalRows = sheet.getLastRowNum();
+        System.out.println("\nProcessing rows 4 to " + (totalRows + 1));
+
+        for (int rowIndex = 3; rowIndex <= totalRows; rowIndex++) {
+            processRow(sheet.getRow(rowIndex), rowIndex + 1);
+        }
+
+        // Save the workbook
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            sheet.getWorkbook().write(fos);
+            System.out.println("\nSuccessfully wrote all ISO messages and validation results to spreadsheet");
+        }
+    }
+
+    private void createHeaders(Row headerRow) {
+        Cell isoHeaderCell = headerRow.createCell(82); // Column CE
+        isoHeaderCell.setCellValue("Generated ISO Message");
+        Cell validationHeaderCell = headerRow.createCell(83); // Column CF
+        validationHeaderCell.setCellValue("Validation Results");
+    }
+
+    private void processRow(Row dataRow, int rowNum) throws IOException {
+        if (dataRow == null) {
+            System.out.println("\nSkipping empty row " + rowNum);
+            return;
+        }
+
+        System.out.println("\n=== Processing Row " + rowNum + " ===");
+        builder.clear();
+
+        // Process fields
+        processFields(dataRow);
+
+        // Generate ISO message
+        String isoMessage = builder.buildMessage();
+        System.out.println("\nGenerated ISO Message for Row " + rowNum + ":");
+        System.out.println(isoMessage);
+
+        // Write results to spreadsheet
+        writeResults(dataRow, isoMessage);
+    }
+
+    private void processFields(Row dataRow) {
+        Row headerRow = dataRow.getSheet().getRow(0);
+        
+        for (int colNum = 1; colNum <= 81; colNum++) {
+            Cell headerCell = headerRow.getCell(colNum);
+            Cell dataCell = dataRow.getCell(colNum);
+            
+            if (headerCell != null && dataCell != null) {
+                String de = getCellValueAsString(headerCell).trim();
+                String value = getCellValueAsString(dataCell).trim();
+                
+                if (!de.isEmpty() && !value.isEmpty()) {
+                    builder.addField(de, value);
+                }
+            }
+        }
+    }
+
+    private void writeResults(Row dataRow, String isoMessage) {
+        // Write ISO message
+        Cell messageCell = dataRow.createCell(82);
+        messageCell.setCellValue(isoMessage);
+
+        try {
+            // Validate and write results
+            ValidationResult validationResult = validator.validateMessage(isoMessage, dataRow);
+            validationResult.printResults();
+
+            Cell validationCell = dataRow.createCell(83);
+            String validationSummary = String.format(
+                "Passed: %d, Failed: %d", 
+                validationResult.getResults().values().stream().filter(ValidationResult.FieldResult::isPassed).count(),
+                validationResult.getResults().values().stream().filter(r -> !r.isPassed()).count()
+            );
+            validationCell.setCellValue(validationSummary);
+        } catch (Exception e) {
+            System.out.println("\nValidation failed: " + e.getMessage());
+            Cell validationCell = dataRow.createCell(83);
+            validationCell.setCellValue("Validation Error: " + e.getMessage());
+        }
+    }
+
+    private String getCellValueAsString(Cell cell) {
+        if (cell == null) return "";
+        
+        switch (cell.getCellType()) {
+            case NUMERIC:
+                return String.valueOf((long)cell.getNumericCellValue());
+            case STRING:
+                return cell.getStringCellValue();
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            default:
+                return "";
+        }
     }
 
     public static void loadConfig(String filename) throws IOException {
@@ -477,166 +613,6 @@ public class CreateIsoMessage  {
         }
     }
 
-    public static void generateIsoFromSpreadsheet(String filePath) throws IOException {
-        System.out.println("\n=== Starting ISO message generation and validation from spreadsheet ===");
-        System.out.println("File: " + filePath);
-
-        // Load the ISO configuration
-        loadConfig("iso_config.json");
-
-        // Open the Excel workbook
-        try (FileInputStream fis = new FileInputStream(filePath);
-             Workbook workbook = new XSSFWorkbook(fis)) {
-            
-            Sheet sheet = workbook.getSheetAt(0);
-            String sheetName = sheet.getSheetName();
-            System.out.println("Found worksheet: " + sheetName);
-            
-            if (!"Auth STIP Integration".equals(sheetName)) {
-                System.out.println("Warning: Expected sheet name 'Auth STIP Integration' but found '" + sheetName + "'");
-                System.out.println("Proceeding with processing anyway...");
-            }
-
-            // Get Row 1 for Data Element Keys
-            Row headerRow = sheet.getRow(0);
-            if (headerRow == null) {
-                throw new IOException("Header row (Row 1) not found in spreadsheet");
-            }
-
-            // Process from Row 4 (index 3) onwards
-            int totalRows = sheet.getLastRowNum();
-            System.out.println("\nProcessing rows 4 to " + (totalRows + 1));
-
-            // Create headers for ISO Message and Validation Results
-            Cell isoHeaderCell = headerRow.createCell(82); // Column CE
-            isoHeaderCell.setCellValue("Generated ISO Message");
-            Cell validationHeaderCell = headerRow.createCell(83); // Column CF
-            validationHeaderCell.setCellValue("Validation Results");
-
-            // Process each row starting from row 4
-            for (int rowIndex = 3; rowIndex <= totalRows; rowIndex++) {
-                Row dataRow = sheet.getRow(rowIndex);
-                if (dataRow == null) {
-                    System.out.println("\nSkipping empty row " + (rowIndex + 1));
-                    continue;
-                }
-
-                System.out.println("\n=== Processing Row " + (rowIndex + 1) + " ===");
-
-                // Clear previous field data for new row
-                isoFields.clear();
-                manuallyUpdatedFields.clear();
-                Arrays.fill(primaryBitmap, false);
-                Arrays.fill(secondaryBitmap, false);
-
-                int processedFields = 0;
-                // Start from Column B (index 1) and go to Column CD (index 81)
-                for (int colNum = 1; colNum <= 81; colNum++) {
-                    // Get the Data Element Key from Row 1
-                    Cell headerCell = headerRow.getCell(colNum);
-                    String dataElementKey = getCellValueAsString(headerCell).trim();
-                    if (dataElementKey.isEmpty()) {
-                        continue;
-                    }
-
-                    // Get the data from current row
-                    Cell dataCell = dataRow.getCell(colNum);
-                    String sampleData = getCellValueAsString(dataCell).trim();
-                    if (sampleData.isEmpty()) {
-                        continue;
-                    }
-
-                    System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
-                    System.out.println("  Data Element Key: " + dataElementKey);
-                    System.out.println("  Sample Data: " + sampleData);
-
-                    // Determine the data type from the configuration
-                    String dataType = "String"; // Default type
-                    JsonNode config = fieldConfig.get(dataElementKey);
-                    if (config != null && config.has("type")) {
-                        dataType = config.get("type").asText();
-                    }
-                    System.out.println("  Data Type: " + dataType);
-
-                    try {
-                        // Get the field name from configuration
-                        String fieldName = "";
-                        if (config != null && config.has("name")) {
-                            fieldName = config.get("name").asText();
-                        } else {
-                            System.out.println("  Warning: No field name found in configuration for key " + dataElementKey);
-                            fieldName = "Field_" + dataElementKey; // Fallback
-                        }
-
-                        // Apply the field update using the same logic as i_create_iso_message
-                        applyBddUpdate(fieldName, sampleData, dataType);
-                        processedFields++;
-                        System.out.println("  Status: Processed successfully");
-                    } catch (Exception e) {
-                        System.out.println("  Status: Failed to process - " + e.getMessage());
-                    }
-                }
-
-                if (processedFields > 0) {
-                    System.out.println("\n=== Row " + (rowIndex + 1) + " Processing Summary ===");
-                    System.out.println("Total fields processed: " + processedFields);
-
-                    // Generate default fields and build ISO message
-                    generateDefaultFields();
-                    String isoMessage = buildIsoMessage();
-                    System.out.println("\nGenerated ISO Message for Row " + (rowIndex + 1) + ":");
-                    System.out.println(isoMessage);
-
-                    // Write the ISO message to the spreadsheet
-                    Cell messageCell = dataRow.createCell(82); // Column CE
-                    messageCell.setCellValue(isoMessage);
-
-                    try {
-                        // Validate against canonical form
-                        ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, dataRow);
-                        validationResult.printResults();
-
-                        // Write validation results to the spreadsheet
-                        Cell validationCell = dataRow.createCell(83); // Column CF
-                        String validationSummary = String.format(
-                            "Passed: %d, Failed: %d", 
-                            validationResult.getResults().values().stream().filter(FieldResult::isPassed).count(),
-                            validationResult.getResults().values().stream().filter(r -> !r.isPassed()).count()
-                        );
-                        validationCell.setCellValue(validationSummary);
-                    } catch (Exception e) {
-                        System.out.println("\nValidation failed: " + e.getMessage());
-                        Cell validationCell = dataRow.createCell(83);
-                        validationCell.setCellValue("Validation Error: " + e.getMessage());
-                    }
-                } else {
-                    System.out.println("\nNo fields processed for Row " + (rowIndex + 1) + " - skipping ISO message generation");
-                }
-            }
-
-            // Save the workbook
-            try (FileOutputStream fos = new FileOutputStream(filePath)) {
-                workbook.write(fos);
-                System.out.println("\nSuccessfully wrote all ISO messages and validation results to spreadsheet");
-            }
-        } catch (Exception e) {
-            System.err.println("\nError processing spreadsheet: " + e.getMessage());
-            e.printStackTrace();
-            throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
-        }
-    }
-
-    // Helper method to convert column index to column name (e.g., 0=A, 1=B, etc.)
-    private static String getColumnName(int colNum) {
-        StringBuilder columnName = new StringBuilder();
-        while (colNum >= 0) {
-            int remainder = colNum % 26;
-            columnName.insert(0, (char)('A' + remainder));
-            colNum = (colNum / 26) - 1;
-        }
-        return columnName.toString();
-    }
-
     /**
      * Gets the canonical path(s) for a given DE from the config
      * @param de The data element number
@@ -836,5 +812,4 @@ public class CreateIsoMessage  {
         public String getExpected() { return expected; }
         public String getActual() { return actual; }
     }
-
 }

@@ -1,0 +1,67 @@
+{
+    "transaction": {
+        "transactionId": "000320",
+        "systemTraceAuditNumber": "000320",
+        "linkedTransactionId": "000000000320",
+        "transactionType": "AUTH_REQ",
+        "transactionDateTime": "2025-05-22T23:09:39",
+        "transmissionDateTime": "2025-05-22T11:09:39",
+        "transactionAmount": {
+            "amount": "299",
+            "currencyCode": 840
+        },
+        "card": {},
+        "member": {
+            "address": {
+                "zipCode": "10001"
+            }
+        },
+        "merchant": {
+            "merchantId": "MERCHANT0000001",
+            "categoryCode": "5912",
+            "address": {
+                "addressLine1": "BESTDDF   123 MAIN ST",
+                "city": "NEW YORK",
+                "state": "NY",
+                "country": {
+                    "countryCode": "US"
+                }
+            },
+            "terminalId": "POSA5678"
+        },
+        "processingCode": "000000",
+        "channel": {
+            "channelType": "POS"
+        },
+        "fees": {},
+        "acquirer": {
+            "acquirerId": "12345678901",
+            "acquirerAddress": {
+                "country": {
+                    "countryCode": "099"
+                }
+            },
+            "transportData": ""
+        },
+        "authorization": {},
+        "authorizationLifeCycle": "101",
+        "retrievalReferenceNumber": "000000000320",
+        "nationalPOSConditionCode": {
+            "terminalClass": {
+                "terminalOperation": "CARD_ACCEPTOR_OPERATED"
+            },
+            "presentationType": {},
+            "securityCondition": "NO_SECURITY_CONCERN",
+            "terminalType": "POS_TERMINAL",
+            "cardDataInputCapability": "MAGNETIC_STRIPE"
+        },
+        "settlement": {
+            "settlementDate": "0531"
+        },
+        "cardHolderInfo": {},
+        "forwardingInstitution": {}
+    },
+    "memberPlanAccount": {
+        "account": {}
+    }
+ }
