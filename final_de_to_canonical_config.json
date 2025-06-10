@@ -569,7 +569,7 @@
         "input": "numeric",
         "canonical": "ISO",
         "mapping": {
-          "840": "USD"
+          "840": "840"
         }
       }
     }

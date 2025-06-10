@@ -972,22 +972,17 @@ public class CreateIsoMessage  {
             JsonNode actualJson = objectMapper.readTree(actual);
             String actualValue = getJsonValue(actualJson, getCanonicalPaths(de).get(0));
 
-            // For numeric format, we want to compare the numeric codes directly
-            if ("numeric".equals(format.get("input").asText())) {
-                // Remove any leading zeros from expected value
-                String normalizedExpected = String.valueOf(Integer.parseInt(expected));
-                String normalizedActual = actualValue;
-
-                if (normalizedExpected.equals(normalizedActual)) {
-                    result.addPassedField(de, expected, actualValue);
-                    return true;
-                }
-                result.addFailedField(de, expected, actualValue);
-                return false;
+            // For currency code, just compare the numeric values directly
+            String normalizedExpected = expected.replaceFirst("^0+", ""); // Remove leading zeros
+            
+            if (normalizedExpected.equals(actualValue)) {
+                result.addPassedField(de, expected, actualValue);
+                return true;
             }
-
-            result.addFailedField(de, expected, "Unsupported currency format");
+            
+            result.addFailedField(de, expected, actualValue);
             return false;
+
         } catch (Exception e) {
             result.addFailedField(de, expected,
                 "Failed to validate currency: " + e.getMessage());
