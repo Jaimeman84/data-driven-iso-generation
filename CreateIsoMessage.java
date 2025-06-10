@@ -1008,58 +1008,56 @@ public class CreateIsoMessage  {
             results.put(de, new FieldResult(FieldStatus.SKIPPED, expected, reason));
         }
         
-        public void addPendingField(String de, String expected, String reason) {
-            results.put(de, new FieldResult(FieldStatus.PENDING, expected, reason));
-        }
-        
-        public void storeCombinedValue(String de1, String de2, String combinedValue) {
-            combinedValues.put(de1 + "+" + de2, combinedValue);
-        }
-        
-        public String getCombinedValue(String de1, String de2) {
-            return combinedValues.get(de1 + "+" + de2);
-        }
-        
         public Map<String, FieldResult> getResults() {
             return results;
         }
-        
-        public boolean isAllPassed() {
-            return results.values().stream()
-                .filter(r -> r.getStatus() != FieldStatus.SKIPPED)
-                .allMatch(r -> r.getStatus() == FieldStatus.PASSED);
-        }
-        
+
         public void printResults() {
             System.out.println("\n=== Validation Results ===");
             System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s", 
                 "DE", "Status", "ISO Value", "Canonical Value", "Mapping"));
             System.out.println("-".repeat(120));
             
-            results.forEach((de, result) -> {
-                JsonNode config = fieldConfig.get(de);
-                List<String> paths = new ArrayList<>();
-                if (config != null && config.has("canonical")) {
-                    JsonNode canonical = config.get("canonical");
-                    if (canonical.isArray()) {
-                        canonical.forEach(path -> paths.add(path.asText()));
+            // Sort the results by DE number for consistent display
+            new TreeMap<>(results).forEach((de, result) -> {
+                try {
+                    JsonNode config = fieldConfig.get(de);
+                    List<String> paths = new ArrayList<>();
+                    if (config != null && config.has("canonical")) {
+                        JsonNode canonical = config.get("canonical");
+                        if (canonical.isArray()) {
+                            canonical.forEach(path -> {
+                                if (path != null) {
+                                    paths.add(path.asText());
+                                }
+                            });
+                        }
                     }
-                }
-                String canonicalPath = paths.isEmpty() ? "No mapping" : String.join(", ", paths);
+                    String canonicalPath = paths.isEmpty() ? "No mapping" : String.join(", ", paths);
 
-                // Format ISO value to show original value and any paired values
-                String isoValue = formatIsoValue(de, result);
-                
-                // Format canonical value with any relevant conversion info
-                String canonicalValue = formatCanonicalValue(de, result);
-                
-                System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
-                    de,
-                    result.getStatus().toString(),
-                    truncateOrPad(isoValue, 40),
-                    truncateOrPad(canonicalValue, 40),
-                    canonicalPath
-                ));
+                    // Format ISO value to show original value and any paired values
+                    String isoValue = formatIsoValue(de, result);
+                    
+                    // Format canonical value with any relevant conversion info
+                    String canonicalValue = formatCanonicalValue(de, result);
+                    
+                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
+                        de,
+                        result.getStatus().toString(),
+                        truncateOrPad(isoValue, 40),
+                        truncateOrPad(canonicalValue, 40),
+                        canonicalPath
+                    ));
+                } catch (Exception e) {
+                    // If there's an error formatting a specific row, print it with error info
+                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
+                        de,
+                        "ERROR",
+                        "Error formatting result",
+                        e.getMessage(),
+                        "Error"
+                    ));
+                }
             });
             
             // Print summary
@@ -1091,30 +1089,41 @@ public class CreateIsoMessage  {
         }
 
         private String formatIsoValue(String de, FieldResult result) {
+            if (result == null || result.getExpected() == null) {
+                return "";
+            }
+
             JsonNode config = fieldConfig.get(de);
             if (config != null && config.has("validation")) {
                 JsonNode validation = config.get("validation");
                 
-                // For paired datetime fields
-                if (validation.has("format") && validation.get("format").has("pairedField")) {
-                    JsonNode paired = validation.get("format").get("pairedField");
-                    String otherField = paired.get("field").asText();
-                    String fieldType = paired.get("type").asText();
-                    
-                    // Show both values that make up the datetime
-                    String otherValue = isoFields.get(Integer.parseInt(otherField));
-                    if ("date".equals(fieldType)) {
-                        return String.format("%s (Date: %s, Time: %s)", 
-                            result.getExpected(), result.getExpected(), otherValue);
-                    } else {
-                        return String.format("%s (Date: %s, Time: %s)", 
-                            result.getExpected(), otherValue, result.getExpected());
+                try {
+                    // For paired datetime fields
+                    if (validation.has("format") && validation.get("format").has("pairedField")) {
+                        JsonNode paired = validation.get("format").get("pairedField");
+                        String otherField = paired.get("field").asText();
+                        String fieldType = paired.get("type").asText();
+                        
+                        // Show both values that make up the datetime
+                        String otherValue = isoFields.get(Integer.parseInt(otherField));
+                        if (otherValue != null) {
+                            if ("date".equals(fieldType)) {
+                                return String.format("%s (Date: %s, Time: %s)", 
+                                    result.getExpected(), result.getExpected(), otherValue);
+                            } else {
+                                return String.format("%s (Date: %s, Time: %s)", 
+                                    result.getExpected(), otherValue, result.getExpected());
+                            }
+                        }
                     }
-                }
-                
-                // For currency codes
-                if ("currency".equals(validation.get("type").asText())) {
-                    return String.format("%s (Numeric code)", result.getExpected());
+                    
+                    // For currency codes
+                    if (validation.has("type") && "currency".equals(validation.get("type").asText())) {
+                        return String.format("%s (Numeric code)", result.getExpected());
+                    }
+                } catch (Exception e) {
+                    // If any error occurs during formatting, return the original value
+                    System.out.println("Warning: Error formatting ISO value for DE " + de + ": " + e.getMessage());
                 }
             }
             
@@ -1122,23 +1131,32 @@ public class CreateIsoMessage  {
         }
 
         private String formatCanonicalValue(String de, FieldResult result) {
+            if (result == null || result.getActual() == null) {
+                return "";
+            }
+
             JsonNode config = fieldConfig.get(de);
             if (config != null && config.has("validation")) {
                 JsonNode validation = config.get("validation");
                 
-                // For paired datetime fields
-                if (validation.has("format") && validation.get("format").has("pairedField")) {
-                    return result.getActual() + " (Combined datetime)";
-                }
-                
-                // For currency codes
-                if ("currency".equals(validation.get("type").asText())) {
-                    return result.getActual() + " (ISO format)";
-                }
-
-                // For amount fields
-                if ("amount".equals(validation.get("type").asText())) {
-                    return result.getActual() + " (Decimal format)";
+                try {
+                    // For paired datetime fields
+                    if (validation.has("format") && validation.get("format").has("pairedField")) {
+                        return result.getActual() + " (Combined datetime)";
+                    }
+                    
+                    // For currency codes
+                    if (validation.has("type")) {
+                        String type = validation.get("type").asText();
+                        if ("currency".equals(type)) {
+                            return result.getActual() + " (ISO format)";
+                        } else if ("amount".equals(type)) {
+                            return result.getActual() + " (Decimal format)";
+                        }
+                    }
+                } catch (Exception e) {
+                    // If any error occurs during formatting, return the original value
+                    System.out.println("Warning: Error formatting canonical value for DE " + de + ": " + e.getMessage());
                 }
             }
             
@@ -1147,7 +1165,7 @@ public class CreateIsoMessage  {
 
         private String truncateOrPad(String str, int length) {
             if (str == null) {
-                return String.format("%-" + length + "s", "null");
+                return String.format("%-" + length + "s", "");
             }
             if (str.length() > length) {
                 return str.substring(0, length - 3) + "...";
