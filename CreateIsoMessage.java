@@ -759,6 +759,8 @@ public class CreateIsoMessage  {
                         return validateDateTime(de, expected, actual, result, validation.get("format"));
                     case "currency":
                         return validateCurrency(de, expected, actual, result, validation.get("format"));
+                    case "merchant_location":
+                        return validateMerchantLocation(de, expected, actual, result);
                 }
             }
         }
@@ -946,6 +948,70 @@ public class CreateIsoMessage  {
             result.addFailedField(de, expected,
                 actual + " (Failed to validate currency: " + e.getMessage() + ")");
             return false;
+        }
+    }
+
+    /**
+     * Validates DE 43 merchant location field by parsing its sub-elements
+     */
+    private static boolean validateMerchantLocation(String de, String expected, String actual, ValidationResult result) {
+        try {
+            // Parse the expected value into sub-elements based on fixed positions
+            String nameAndAddress = expected.length() >= 23 ? expected.substring(0, 23).trim() : expected;
+            String city = expected.length() >= 36 ? expected.substring(23, 36).trim() : "";
+            String state = expected.length() >= 38 ? expected.substring(36, 38).trim() : "";
+            String country = expected.length() >= 40 ? expected.substring(38, 40).trim() : "";
+
+            // Parse the actual (canonical) JSON response
+            JsonNode actualJson = objectMapper.readTree(actual);
+            
+            // Extract values from canonical format
+            String actualAddress = getJsonValue(actualJson, "transaction.merchant.address.addressLine1");
+            String actualCity = getJsonValue(actualJson, "transaction.merchant.address.city");
+            String actualState = getJsonValue(actualJson, "transaction.merchant.address.state");
+            String actualCountry = getJsonValue(actualJson, "transaction.merchant.address.country.countryCode");
+
+            // Build validation message
+            StringBuilder validationMsg = new StringBuilder();
+            validationMsg.append("Parsed components:\n");
+            validationMsg.append(String.format("Address: %s -> %s\n", nameAndAddress, actualAddress));
+            validationMsg.append(String.format("City: %s -> %s\n", city, actualCity));
+            validationMsg.append(String.format("State: %s -> %s\n", state, actualState));
+            validationMsg.append(String.format("Country: %s -> %s", country, actualCountry));
+
+            // Check if all components match
+            boolean matches = nameAndAddress.equals(actualAddress) &&
+                            city.equals(actualCity) &&
+                            state.equals(actualState) &&
+                            country.equals(actualCountry);
+
+            if (matches) {
+                result.addPassedField(de, expected, validationMsg.toString());
+                return true;
+            } else {
+                result.addFailedField(de, expected, validationMsg.toString());
+                return false;
+            }
+        } catch (Exception e) {
+            result.addFailedField(de, expected,
+                "Failed to validate merchant location: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Helper method to safely get value from JSON path
+     */
+    private static String getJsonValue(JsonNode node, String path) {
+        try {
+            String[] parts = path.split("\\.");
+            JsonNode current = node;
+            for (String part : parts) {
+                current = current.path(part);
+            }
+            return current.isNull() ? "" : current.asText();
+        } catch (Exception e) {
+            return "";
         }
     }
 

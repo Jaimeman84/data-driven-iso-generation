@@ -491,15 +491,20 @@
   "43": {
     "name": "Card Acceptor Name / Location",
     "canonical": [
-      "transaction.merchant.name,",
-      "transaction.merchant.address"
+      "transaction.merchant.address.addressLine1",
+      "transaction.merchant.address.city",
+      "transaction.merchant.address.state",
+      "transaction.merchant.address.country.countryCode"
     ],
     "format": "fixed",
     "type": "alphanumeric",
     "length": 40,
     "notes": "Critical for MID-based adjudication.",
     "active": false,
-    "SampleData": "12345MainTownStreetRoadNewYork123456NYUS"
+    "SampleData": "Best Buy 123 Main St   New York     NYUS",
+    "validation": {
+            "type": "merchant_location"
+    }
   },
   "44": {
     "name": "Additional Response Data",
