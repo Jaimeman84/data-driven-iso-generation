@@ -916,15 +916,15 @@ public class CreateIsoMessage  {
         private final Map<String, FieldResult> results = new HashMap<>();
         
         public void addPassedField(String de, String expected, String actual) {
-            results.put(de, new FieldResult(true, expected, actual));
+            results.put(de, new FieldResult(FieldStatus.PASSED, expected, actual));
         }
         
         public void addFailedField(String de, String expected, String actual) {
-            results.put(de, new FieldResult(false, expected, actual));
+            results.put(de, new FieldResult(FieldStatus.FAILED, expected, actual));
         }
         
         public void addSkippedField(String de, String expected, String reason) {
-            results.put(de, new FieldResult(false, expected, reason));
+            results.put(de, new FieldResult(FieldStatus.SKIPPED, expected, reason));
         }
         
         public Map<String, FieldResult> getResults() {
@@ -932,7 +932,9 @@ public class CreateIsoMessage  {
         }
         
         public boolean isAllPassed() {
-            return results.values().stream().allMatch(FieldResult::isPassed);
+            return results.values().stream()
+                .filter(r -> r.getStatus() != FieldStatus.SKIPPED)
+                .allMatch(r -> r.getStatus() == FieldStatus.PASSED);
         }
         
         public void printResults() {
@@ -954,20 +956,39 @@ public class CreateIsoMessage  {
                 
                 System.out.println(String.format("%-6s | %-15s | %-30s | %-30s | %s",
                     de,
-                    result.isPassed() ? "PASS" : "FAIL",
+                    result.getStatus().toString(),
                     truncateOrPad(result.getExpected(), 30),
                     truncateOrPad(result.getActual(), 30),
                     canonicalPath
                 ));
             });
             
-            // Print summary
-            long passCount = results.values().stream().filter(FieldResult::isPassed).count();
-            long failCount = results.size() - passCount;
+            // Print summary with skipped fields
+            long passCount = results.values().stream()
+                .filter(r -> r.getStatus() == FieldStatus.PASSED)
+                .count();
+            long failCount = results.values().stream()
+                .filter(r -> r.getStatus() == FieldStatus.FAILED)
+                .count();
+            long skipCount = results.values().stream()
+                .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
+                .count();
+
             System.out.println("\nSummary:");
             System.out.println("Total Fields: " + results.size());
             System.out.println("Passed: " + passCount);
             System.out.println("Failed: " + failCount);
+            System.out.println("Skipped: " + skipCount + 
+                (skipCount > 0 ? " (Fields not canonicalized or requiring special handling)" : ""));
+
+            // If there are skipped fields, show them and their reasons
+            if (skipCount > 0) {
+                System.out.println("\nSkipped Fields:");
+                results.entrySet().stream()
+                    .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                    .forEach(e -> System.out.println(String.format("DE %s: %s", 
+                        e.getKey(), e.getValue().getActual())));
+            }
         }
         
         private String truncateOrPad(String str, int length) {
@@ -982,20 +1003,40 @@ public class CreateIsoMessage  {
     }
     
     /**
+     * Enum to represent field validation status
+     */
+    public enum FieldStatus {
+        PASSED("PASS"),
+        FAILED("FAIL"),
+        SKIPPED("SKIP");
+
+        private final String display;
+
+        FieldStatus(String display) {
+            this.display = display;
+        }
+
+        @Override
+        public String toString() {
+            return display;
+        }
+    }
+    
+    /**
      * Class to hold individual field validation results
      */
     public static class FieldResult {
-        private final boolean passed;
+        private final FieldStatus status;
         private final String expected;
         private final String actual;
         
-        public FieldResult(boolean passed, String expected, String actual) {
-            this.passed = passed;
+        public FieldResult(FieldStatus status, String expected, String actual) {
+            this.status = status;
             this.expected = expected;
             this.actual = actual;
         }
         
-        public boolean isPassed() { return passed; }
+        public FieldStatus getStatus() { return status; }
         public String getExpected() { return expected; }
         public String getActual() { return actual; }
     }
