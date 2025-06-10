@@ -774,13 +774,47 @@ public class CreateIsoMessage  {
         
         public void printResults() {
             System.out.println("\n=== Validation Results ===");
+            System.out.println(String.format("%-6s | %-15s | %-30s | %-30s | %s", 
+                "DE", "Status", "Expected Value", "Actual Value", "Canonical Path"));
+            System.out.println("-".repeat(100));
+            
             results.forEach((de, result) -> {
-                System.out.printf("DE %s: %s%n", de, result.isPassed() ? "PASS" : "FAIL");
-                if (!result.isPassed()) {
-                    System.out.printf("  Expected: %s%n  Actual: %s%n", 
-                        result.getExpected(), result.getActual());
+                JsonNode config = fieldConfig.get(de);
+                List<String> paths = new ArrayList<>();
+                if (config != null && config.has("canonical")) {
+                    JsonNode canonical = config.get("canonical");
+                    if (canonical.isArray()) {
+                        canonical.forEach(path -> paths.add(path.asText()));
+                    }
                 }
+                String canonicalPath = paths.isEmpty() ? "No mapping" : String.join(", ", paths);
+                
+                System.out.println(String.format("%-6s | %-15s | %-30s | %-30s | %s",
+                    de,
+                    result.isPassed() ? "PASS" : "FAIL",
+                    truncateOrPad(result.getExpected(), 30),
+                    truncateOrPad(result.getActual(), 30),
+                    canonicalPath
+                ));
             });
+            
+            // Print summary
+            long passCount = results.values().stream().filter(FieldResult::isPassed).count();
+            long failCount = results.size() - passCount;
+            System.out.println("\nSummary:");
+            System.out.println("Total Fields: " + results.size());
+            System.out.println("Passed: " + passCount);
+            System.out.println("Failed: " + failCount);
+        }
+        
+        private String truncateOrPad(String str, int length) {
+            if (str == null) {
+                return String.format("%-" + length + "s", "null");
+            }
+            if (str.length() > length) {
+                return str.substring(0, length - 3) + "...";
+            }
+            return String.format("%-" + length + "s", str);
         }
     }
     
