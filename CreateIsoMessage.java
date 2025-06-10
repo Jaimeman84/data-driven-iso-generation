@@ -667,8 +667,6 @@ public class CreateIsoMessage  {
         
         // Get canonical response
         String canonicalResponse = sendIsoMessageToCanonical(isoMessage);
-        System.out.println("\nDEBUG - Canonical Response received:");
-        System.out.println(canonicalResponse);
         
         // Parse the canonical response once
         JsonNode canonicalJson = objectMapper.readTree(canonicalResponse);
@@ -991,9 +989,6 @@ public class CreateIsoMessage  {
      */
     private static boolean validateMerchantLocation(String de, String expected, JsonNode canonicalJson, ValidationResult result) {
         try {
-            System.out.println("\nDEBUG - DE 43 Validation:");
-            System.out.println("Raw ISO value: [" + expected + "]");
-
             // Ensure the expected value is padded to full length if shorter
             String paddedExpected = String.format("%-40s", expected).substring(0, 40);
             
@@ -1003,23 +998,11 @@ public class CreateIsoMessage  {
             String state = paddedExpected.substring(36, 38).trim();
             String country = paddedExpected.substring(38, 40).trim();
 
-            System.out.println("\nParsed ISO components:");
-            System.out.println("Name/Address (1-23): [" + nameAndAddress + "]");
-            System.out.println("City (24-36): [" + city + "]");
-            System.out.println("State (37-38): [" + state + "]");
-            System.out.println("Country (39-40): [" + country + "]");
-
             // Extract values from canonical format
             String actualAddress = getJsonValue(canonicalJson, "transaction.merchant.address.addressLine1");
             String actualCity = getJsonValue(canonicalJson, "transaction.merchant.address.city");
             String actualState = getJsonValue(canonicalJson, "transaction.merchant.address.state");
             String actualCountry = getJsonValue(canonicalJson, "transaction.merchant.address.country.countryCode");
-
-            System.out.println("\nCanonical values:");
-            System.out.println("Address: [" + actualAddress + "]");
-            System.out.println("City: [" + actualCity + "]");
-            System.out.println("State: [" + actualState + "]");
-            System.out.println("Country: [" + actualCountry + "]");
 
             // Compare each component and collect mismatches
             StringBuilder validationMsg = new StringBuilder();
@@ -1039,23 +1022,16 @@ public class CreateIsoMessage  {
             validationMsg.append(String.format("Country: [%s] %s [%s]", 
                 country, countryMatch ? "=" : "≠", actualCountry));
 
-            System.out.println("\nValidation results:");
-            System.out.println(validationMsg.toString());
-
             boolean allMatch = addressMatch && cityMatch && stateMatch && countryMatch;
             
             if (allMatch) {
                 result.addPassedField(de, expected, validationMsg.toString());
-                System.out.println("\nResult: PASSED");
             } else {
                 result.addFailedField(de, expected, validationMsg.toString());
-                System.out.println("\nResult: FAILED");
             }
             return allMatch;
 
         } catch (Exception e) {
-            System.out.println("\nERROR processing DE 43: " + e.getMessage());
-            e.printStackTrace();
             result.addFailedField(de, expected,
                 "Failed to validate merchant location: " + e.getMessage());
             return false;
@@ -1074,7 +1050,6 @@ public class CreateIsoMessage  {
             }
             return current.isNull() ? "" : current.asText().trim();
         } catch (Exception e) {
-            System.out.println("Error getting JSON value for path " + path + ": " + e.getMessage());
             return "";
         }
     }
