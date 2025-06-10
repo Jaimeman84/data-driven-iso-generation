@@ -171,9 +171,20 @@
     "format": "fixed",
     "type": "numeric",
     "length": 6,
-    "notes": "Format: hhmmss. Must be a valid time. Checked against issuer's system time for variance.",
+    "notes": "Format: hhmmss. Must be a valid time. Combined with DE 13 for canonical datetime.",
     "active": false,
-    "SampleData": "150405"
+    "SampleData": "230939",
+    "validation": {
+      "type": "datetime",
+      "format": {
+        "input": "hhmmss",
+        "canonical": "YYYY-MM-DDThh:mm:ssZ",
+        "requires": {
+          "field": "13",
+          "combine": "prefix"
+        }
+      }
+    }
   },
   "13": {
     "name": "Date, Local Transaction",
@@ -183,9 +194,20 @@
     "format": "fixed",
     "type": "numeric",
     "length": 4,
-    "notes": "Format: MMDD. Must be a valid date. Checked against issuer's system time for variance.",
+    "notes": "Format: MMDD. Must be a valid date. Combined with DE 12 for canonical datetime.",
     "active": false,
-    "SampleData": "0329"
+    "SampleData": "0603",
+    "validation": {
+      "type": "datetime",
+      "format": {
+        "input": "MMDD",
+        "canonical": "YYYY-MM-DDThh:mm:ssZ",
+        "requires": {
+          "field": "12",
+          "combine": "suffix"
+        }
+      }
+    }
   },
   "14": {
     "name": "Date, Expiration",

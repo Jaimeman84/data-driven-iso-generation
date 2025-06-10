@@ -805,34 +805,120 @@ public class CreateIsoMessage  {
             String inputFormat = format.get("input").asText();
             String canonicalFormat = format.get("canonical").asText();
 
-            // Parse the input format (MMDDhhmmss)
+            // Check if this field requires combination with another field
+            if (format.has("requires")) {
+                JsonNode requires = format.get("requires");
+                String otherField = requires.get("field").asText();
+                String combineType = requires.get("combine").asText();
+                
+                // Get the other field's value from the ISO message
+                String otherValue = isoFields.get(Integer.parseInt(otherField));
+                if (otherValue == null) {
+                    result.addFailedField(de, expected,
+                        String.format("Required field DE %s not found for datetime combination", otherField));
+                    return false;
+                }
+
+                // Combine the values based on the combine type
+                String combinedValue;
+                if ("prefix".equals(combineType)) {
+                    // This field goes after the other field
+                    combinedValue = otherValue + expected;
+                } else {
+                    // This field goes before the other field
+                    combinedValue = expected + otherValue;
+                }
+
+                // Store the combined value for the other field to use
+                result.storeCombinedValue(de, otherField, combinedValue);
+
+                // If this is the suffix field, proceed with validation
+                if ("suffix".equals(combineType)) {
+                    return validateCombinedDateTime(de, combinedValue, actual, result);
+                }
+
+                // For prefix field, mark as pending
+                result.addPendingField(de, expected, 
+                    String.format("Waiting for DE %s to complete datetime validation", otherField));
+                return true;
+            }
+
+            // Regular datetime validation for non-combined fields
+            return validateSingleDateTime(de, expected, actual, result);
+        } catch (Exception e) {
+            result.addFailedField(de, expected,
+                actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+            return false;
+        }
+    }
+
+    /**
+     * Validates a single datetime field (like DE 7)
+     */
+    private static boolean validateSingleDateTime(String de, String expected, String actual, ValidationResult result) {
+        try {
+            // Parse the expected MMDDhhmmss format
             String month = expected.substring(0, 2);
             String day = expected.substring(2, 4);
             String hour = expected.substring(4, 6);
             String minute = expected.substring(6, 8);
             String second = expected.substring(8, 10);
-
+            
             // Get current year
             int year = Calendar.getInstance().get(Calendar.YEAR);
-
+            
             // Create expected datetime string
             String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
                 year, month, day, hour, minute, second);
-
+            
             // Compare ignoring timezone
             if (actual.startsWith(expectedDateTime)) {
-                result.addPassedField(de, expected, actual + 
-                    String.format(" (Converted from %s to %s)", inputFormat, canonicalFormat));
+                result.addPassedField(de, expected, actual);
                 return true;
             }
-
+            
             result.addFailedField(de, expected + 
-                String.format(" (Expected %s format: %s)", canonicalFormat, expectedDateTime), actual);
+                String.format(" (Expected format: %s)", expectedDateTime), actual);
             return false;
-
         } catch (Exception e) {
             result.addFailedField(de, expected,
                 actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+            return false;
+        }
+    }
+
+    /**
+     * Validates combined datetime fields (DE 12 + DE 13)
+     */
+    private static boolean validateCombinedDateTime(String de, String combinedValue, String actual, ValidationResult result) {
+        try {
+            // Parse the combined MMDD + hhmmss format
+            String month = combinedValue.substring(0, 2);
+            String day = combinedValue.substring(2, 4);
+            String hour = combinedValue.substring(4, 6);
+            String minute = combinedValue.substring(6, 8);
+            String second = combinedValue.substring(8, 10);
+            
+            // Get current year
+            int year = Calendar.getInstance().get(Calendar.YEAR);
+            
+            // Create expected datetime string
+            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
+                year, month, day, hour, minute, second);
+            
+            // Compare ignoring timezone
+            if (actual.startsWith(expectedDateTime)) {
+                result.addPassedField(de, combinedValue, actual + 
+                    " (Combined from DE 13 (MMDD) and DE 12 (hhmmss))");
+                return true;
+            }
+            
+            result.addFailedField(de, combinedValue + 
+                String.format(" (Expected format: %s)", expectedDateTime), actual);
+            return false;
+        } catch (Exception e) {
+            result.addFailedField(de, combinedValue,
+                actual + " (Failed to parse combined datetime: " + e.getMessage() + ")");
             return false;
         }
     }
@@ -915,6 +1001,7 @@ public class CreateIsoMessage  {
      */
     public static class ValidationResult {
         private final Map<String, FieldResult> results = new HashMap<>();
+        private final Map<String, String> combinedValues = new HashMap<>();
         
         public void addPassedField(String de, String expected, String actual) {
             results.put(de, new FieldResult(FieldStatus.PASSED, expected, actual));
@@ -926,6 +1013,18 @@ public class CreateIsoMessage  {
         
         public void addSkippedField(String de, String expected, String reason) {
             results.put(de, new FieldResult(FieldStatus.SKIPPED, expected, reason));
+        }
+        
+        public void addPendingField(String de, String expected, String reason) {
+            results.put(de, new FieldResult(FieldStatus.PENDING, expected, reason));
+        }
+        
+        public void storeCombinedValue(String de1, String de2, String combinedValue) {
+            combinedValues.put(de1 + "+" + de2, combinedValue);
+        }
+        
+        public String getCombinedValue(String de1, String de2) {
+            return combinedValues.get(de1 + "+" + de2);
         }
         
         public Map<String, FieldResult> getResults() {
@@ -1009,7 +1108,8 @@ public class CreateIsoMessage  {
     public enum FieldStatus {
         PASSED("PASS"),
         FAILED("FAIL"),
-        SKIPPED("SKIP");
+        SKIPPED("SKIP"),
+        PENDING("PENDING");  // Added for fields waiting for their pair
 
         private final String display;
 
