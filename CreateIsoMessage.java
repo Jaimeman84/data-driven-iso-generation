@@ -707,8 +707,14 @@ public class CreateIsoMessage  {
                     if (actualNode != null) {
                         String actualValue = actualNode.asText();
                         
-                        // Apply specialized validation based on DE
-                        if (validateSpecialCase(de, expectedValue, actualValue, result)) {
+                        // For special validation cases, pass the entire canonical response
+                        if (hasSpecialValidation(de)) {
+                            if (validateSpecialCase(de, expectedValue, canonicalResponse, result)) {
+                                foundMatch = true;
+                                break;
+                            }
+                        } else if (expectedValue.equals(actualValue)) {
+                            result.addPassedField(de, expectedValue, actualValue);
                             foundMatch = true;
                             break;
                         }
@@ -725,6 +731,18 @@ public class CreateIsoMessage  {
         }
         
         return result;
+    }
+
+    /**
+     * Check if a DE requires special validation
+     */
+    private static boolean hasSpecialValidation(String de) {
+        JsonNode config = fieldConfig.get(de);
+        if (config != null && config.has("validation")) {
+            JsonNode validation = config.get("validation");
+            return validation.has("type");
+        }
+        return false;
     }
 
     /**
@@ -770,7 +788,14 @@ public class CreateIsoMessage  {
                     case "currency":
                         return validateCurrency(de, expected, actual, result, validation.get("format"));
                     case "merchant_location":
-                        return validateMerchantLocation(de, expected, actual, result);
+                        try {
+                            JsonNode actualJson = objectMapper.readTree(actual);
+                            return validateMerchantLocation(de, expected, actualJson, result);
+                        } catch (Exception e) {
+                            System.out.println("Error parsing JSON in validateSpecialCase: " + e.getMessage());
+                            result.addFailedField(de, expected, "Failed to parse canonical response: " + e.getMessage());
+                            return false;
+                        }
                 }
             }
         }
