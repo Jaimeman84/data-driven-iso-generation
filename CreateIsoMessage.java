@@ -599,9 +599,10 @@ public class CreateIsoMessage  {
                         // Write validation results to the spreadsheet
                         Cell validationCell = dataRow.createCell(83); // Column CF
                         String validationSummary = String.format(
-                            "Passed: %d, Failed: %d", 
-                            validationResult.getResults().values().stream().filter(FieldResult::isPassed).count(),
-                            validationResult.getResults().values().stream().filter(r -> !r.isPassed()).count()
+                            "Passed: %d, Failed: %d, Skipped: %d", 
+                            validationResult.getResults().values().stream().filter(r -> r.getStatus() == FieldStatus.PASSED).count(),
+                            validationResult.getResults().values().stream().filter(r -> r.getStatus() == FieldStatus.FAILED).count(),
+                            validationResult.getResults().values().stream().filter(r -> r.getStatus() == FieldStatus.SKIPPED).count()
                         );
                         validationCell.setCellValue(validationSummary);
                     } catch (Exception e) {
