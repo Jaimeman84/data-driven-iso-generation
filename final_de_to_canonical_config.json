@@ -171,7 +171,7 @@
     "format": "fixed",
     "type": "numeric",
     "length": 6,
-    "notes": "Format: hhmmss. Must be a valid time. Combined with DE 13 for canonical datetime.",
+    "notes": "Format: hhmmss. Must be a valid time. Paired with DE 13 for canonical datetime.",
     "active": false,
     "SampleData": "230939",
     "validation": {
@@ -179,9 +179,9 @@
       "format": {
         "input": "hhmmss",
         "canonical": "YYYY-MM-DDThh:mm:ssZ",
-        "requires": {
+        "pairedField": {
           "field": "13",
-          "combine": "prefix"
+          "type": "time"
         }
       }
     }
@@ -194,7 +194,7 @@
     "format": "fixed",
     "type": "numeric",
     "length": 4,
-    "notes": "Format: MMDD. Must be a valid date. Combined with DE 12 for canonical datetime.",
+    "notes": "Format: MMDD. Must be a valid date. Paired with DE 12 for canonical datetime.",
     "active": false,
     "SampleData": "0603",
     "validation": {
@@ -202,9 +202,9 @@
       "format": {
         "input": "MMDD",
         "canonical": "YYYY-MM-DDThh:mm:ssZ",
-        "requires": {
+        "pairedField": {
           "field": "12",
-          "combine": "suffix"
+          "type": "date"
         }
       }
     }

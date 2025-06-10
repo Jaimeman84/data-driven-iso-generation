@@ -805,49 +805,79 @@ public class CreateIsoMessage  {
             String inputFormat = format.get("input").asText();
             String canonicalFormat = format.get("canonical").asText();
 
-            // Check if this field requires combination with another field
-            if (format.has("requires")) {
-                JsonNode requires = format.get("requires");
-                String otherField = requires.get("field").asText();
-                String combineType = requires.get("combine").asText();
+            // Check if this field is part of a paired datetime
+            if (format.has("pairedField")) {
+                JsonNode paired = format.get("pairedField");
+                String otherField = paired.get("field").asText();
+                String fieldType = paired.get("type").asText();
                 
                 // Get the other field's value from the ISO message
                 String otherValue = isoFields.get(Integer.parseInt(otherField));
                 if (otherValue == null) {
                     result.addFailedField(de, expected,
-                        String.format("Required field DE %s not found for datetime combination", otherField));
+                        String.format("Paired field DE %s not found - both DE %s and DE %s are needed for datetime validation", 
+                            otherField, de, otherField));
                     return false;
                 }
 
-                // Combine the values based on the combine type
-                String combinedValue;
-                if ("prefix".equals(combineType)) {
-                    // This field goes after the other field
-                    combinedValue = otherValue + expected;
-                } else {
-                    // This field goes before the other field
-                    combinedValue = expected + otherValue;
-                }
+                // Combine the values based on their types
+                String dateValue = "date".equals(fieldType) ? expected : otherValue;
+                String timeValue = "time".equals(fieldType) ? expected : otherValue;
+                String combinedValue = dateValue + timeValue;
 
-                // Store the combined value for the other field to use
-                result.storeCombinedValue(de, otherField, combinedValue);
-
-                // If this is the suffix field, proceed with validation
-                if ("suffix".equals(combineType)) {
-                    return validateCombinedDateTime(de, combinedValue, actual, result);
-                }
-
-                // For prefix field, mark as pending
-                result.addPendingField(de, expected, 
-                    String.format("Waiting for DE %s to complete datetime validation", otherField));
-                return true;
+                // Validate the combined datetime
+                return validatePairedDateTime(de, otherField, combinedValue, actual, result);
             }
 
-            // Regular datetime validation for non-combined fields
+            // Regular datetime validation for non-paired fields
             return validateSingleDateTime(de, expected, actual, result);
         } catch (Exception e) {
             result.addFailedField(de, expected,
                 actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+            return false;
+        }
+    }
+
+    /**
+     * Validates paired datetime fields (DE 12 + DE 13)
+     */
+    private static boolean validatePairedDateTime(String de1, String de2, String combinedValue, String actual, ValidationResult result) {
+        try {
+            // Parse the combined MMDD + hhmmss format
+            String month = combinedValue.substring(0, 2);
+            String day = combinedValue.substring(2, 4);
+            String hour = combinedValue.substring(4, 6);
+            String minute = combinedValue.substring(6, 8);
+            String second = combinedValue.substring(8, 10);
+            
+            // Get current year
+            int year = Calendar.getInstance().get(Calendar.YEAR);
+            
+            // Create expected datetime string
+            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
+                year, month, day, hour, minute, second);
+            
+            // Compare ignoring timezone
+            if (actual.startsWith(expectedDateTime)) {
+                // Add success result for both fields
+                String successMessage = String.format("%s (Validated with DE %s and DE %s)", 
+                    actual, de1, de2);
+                result.addPassedField(de1, combinedValue, successMessage);
+                result.addPassedField(de2, combinedValue, successMessage);
+                return true;
+            }
+            
+            // Add failure result for both fields
+            String failureMessage = String.format("%s (Expected format: %s from DE %s and DE %s)", 
+                actual, expectedDateTime, de1, de2);
+            result.addFailedField(de1, combinedValue, failureMessage);
+            result.addFailedField(de2, combinedValue, failureMessage);
+            return false;
+        } catch (Exception e) {
+            String errorMessage = String.format("%s (Failed to parse paired datetime from DE %s and DE %s: %s)", 
+                actual, de1, de2, e.getMessage());
+            result.addFailedField(de1, combinedValue, errorMessage);
+            result.addFailedField(de2, combinedValue, errorMessage);
             return false;
         }
     }
@@ -883,42 +913,6 @@ public class CreateIsoMessage  {
         } catch (Exception e) {
             result.addFailedField(de, expected,
                 actual + " (Failed to parse datetime: " + e.getMessage() + ")");
-            return false;
-        }
-    }
-
-    /**
-     * Validates combined datetime fields (DE 12 + DE 13)
-     */
-    private static boolean validateCombinedDateTime(String de, String combinedValue, String actual, ValidationResult result) {
-        try {
-            // Parse the combined MMDD + hhmmss format
-            String month = combinedValue.substring(0, 2);
-            String day = combinedValue.substring(2, 4);
-            String hour = combinedValue.substring(4, 6);
-            String minute = combinedValue.substring(6, 8);
-            String second = combinedValue.substring(8, 10);
-            
-            // Get current year
-            int year = Calendar.getInstance().get(Calendar.YEAR);
-            
-            // Create expected datetime string
-            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
-                year, month, day, hour, minute, second);
-            
-            // Compare ignoring timezone
-            if (actual.startsWith(expectedDateTime)) {
-                result.addPassedField(de, combinedValue, actual + 
-                    " (Combined from DE 13 (MMDD) and DE 12 (hhmmss))");
-                return true;
-            }
-            
-            result.addFailedField(de, combinedValue + 
-                String.format(" (Expected format: %s)", expectedDateTime), actual);
-            return false;
-        } catch (Exception e) {
-            result.addFailedField(de, combinedValue,
-                actual + " (Failed to parse combined datetime: " + e.getMessage() + ")");
             return false;
         }
     }
@@ -1001,7 +995,6 @@ public class CreateIsoMessage  {
      */
     public static class ValidationResult {
         private final Map<String, FieldResult> results = new HashMap<>();
-        private final Map<String, String> combinedValues = new HashMap<>();
         
         public void addPassedField(String de, String expected, String actual) {
             results.put(de, new FieldResult(FieldStatus.PASSED, expected, actual));
@@ -1039,9 +1032,9 @@ public class CreateIsoMessage  {
         
         public void printResults() {
             System.out.println("\n=== Validation Results ===");
-            System.out.println(String.format("%-6s | %-15s | %-30s | %-30s | %s", 
-                "DE", "Status", "Expected Value", "Actual Value", "Canonical Path"));
-            System.out.println("-".repeat(100));
+            System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s", 
+                "DE", "Status", "ISO Value", "Canonical Value", "Mapping"));
+            System.out.println("-".repeat(120));
             
             results.forEach((de, result) -> {
                 JsonNode config = fieldConfig.get(de);
@@ -1053,17 +1046,23 @@ public class CreateIsoMessage  {
                     }
                 }
                 String canonicalPath = paths.isEmpty() ? "No mapping" : String.join(", ", paths);
+
+                // Format ISO value to show original value and any paired values
+                String isoValue = formatIsoValue(de, result);
                 
-                System.out.println(String.format("%-6s | %-15s | %-30s | %-30s | %s",
+                // Format canonical value with any relevant conversion info
+                String canonicalValue = formatCanonicalValue(de, result);
+                
+                System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
                     de,
                     result.getStatus().toString(),
-                    truncateOrPad(result.getExpected(), 30),
-                    truncateOrPad(result.getActual(), 30),
+                    truncateOrPad(isoValue, 40),
+                    truncateOrPad(canonicalValue, 40),
                     canonicalPath
                 ));
             });
             
-            // Print summary with skipped fields
+            // Print summary
             long passCount = results.values().stream()
                 .filter(r -> r.getStatus() == FieldStatus.PASSED)
                 .count();
@@ -1090,7 +1089,62 @@ public class CreateIsoMessage  {
                         e.getKey(), e.getValue().getActual())));
             }
         }
-        
+
+        private String formatIsoValue(String de, FieldResult result) {
+            JsonNode config = fieldConfig.get(de);
+            if (config != null && config.has("validation")) {
+                JsonNode validation = config.get("validation");
+                
+                // For paired datetime fields
+                if (validation.has("format") && validation.get("format").has("pairedField")) {
+                    JsonNode paired = validation.get("format").get("pairedField");
+                    String otherField = paired.get("field").asText();
+                    String fieldType = paired.get("type").asText();
+                    
+                    // Show both values that make up the datetime
+                    String otherValue = isoFields.get(Integer.parseInt(otherField));
+                    if ("date".equals(fieldType)) {
+                        return String.format("%s (Date: %s, Time: %s)", 
+                            result.getExpected(), result.getExpected(), otherValue);
+                    } else {
+                        return String.format("%s (Date: %s, Time: %s)", 
+                            result.getExpected(), otherValue, result.getExpected());
+                    }
+                }
+                
+                // For currency codes
+                if ("currency".equals(validation.get("type").asText())) {
+                    return String.format("%s (Numeric code)", result.getExpected());
+                }
+            }
+            
+            return result.getExpected();
+        }
+
+        private String formatCanonicalValue(String de, FieldResult result) {
+            JsonNode config = fieldConfig.get(de);
+            if (config != null && config.has("validation")) {
+                JsonNode validation = config.get("validation");
+                
+                // For paired datetime fields
+                if (validation.has("format") && validation.get("format").has("pairedField")) {
+                    return result.getActual() + " (Combined datetime)";
+                }
+                
+                // For currency codes
+                if ("currency".equals(validation.get("type").asText())) {
+                    return result.getActual() + " (ISO format)";
+                }
+
+                // For amount fields
+                if ("amount".equals(validation.get("type").asText())) {
+                    return result.getActual() + " (Decimal format)";
+                }
+            }
+            
+            return result.getActual();
+        }
+
         private String truncateOrPad(String str, int length) {
             if (str == null) {
                 return String.format("%-" + length + "s", "null");
