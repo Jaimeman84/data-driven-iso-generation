@@ -56,7 +56,7 @@
   "4": {
     "name": "Amount, Transaction",
     "canonical": [
-      "transaction.amount"
+      "transaction.transactionAmount.amount"
     ],
     "format": "fixed",
     "type": "numeric",
@@ -189,15 +189,17 @@
   },
   "14": {
     "name": "Date, Expiration",
-    "canonical": [
-      "card.expirationDate"
-    ],
+    "canonical": [],
     "format": "fixed",
     "type": "numeric",
     "length": 4,
     "notes": "Format: YYMM. Used along with DE 2 to validate the card.",
     "active": false,
-    "SampleData": "0231"
+    "SampleData": "0231",
+    "validation": {
+      "skip": true,
+      "reason": "Exp. Date is not canonicalized for security reasons"
+    }
   },
   "15": {
     "name": "Date, Settlement",
@@ -249,7 +251,7 @@
   "19": {
     "name": "Acquiring Institution Country Code",
     "canonical": [
-      "transaction.acquirer.address.country.countryCode"
+      "transaction.acquirer.acquirerAddress.country.countryCode"
     ],
     "format": "fixed",
     "type": "numeric",
@@ -528,9 +530,19 @@
     "format": "fixed",
     "type": "numeric",
     "length": 3,
-    "notes": "Must be USD for domestic transactions. Decline if any other currency code is received.",
+    "notes": "Must be USD (840) for domestic transactions. Decline if any other currency code is received.",
     "active": false,
-    "SampleData": "USD"
+    "SampleData": "840",
+    "validation": {
+      "type": "currency",
+      "format": {
+        "input": "numeric",
+        "canonical": "ISO",
+        "mapping": {
+          "840": "USD"
+        }
+      }
+    }
   },
   "50": {
     "name": "Currency Code, Settlement",

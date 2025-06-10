@@ -756,6 +756,8 @@ public class CreateIsoMessage  {
                         return validateAmount(de, expected, actual, result, validation.get("rules"));
                     case "datetime":
                         return validateDateTime(de, expected, actual, result, validation.get("format"));
+                    case "currency":
+                        return validateCurrency(de, expected, actual, result, validation.get("format"));
                 }
             }
         }
@@ -830,6 +832,38 @@ public class CreateIsoMessage  {
         } catch (Exception e) {
             result.addFailedField(de, expected,
                 actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+            return false;
+        }
+    }
+
+    /**
+     * Validates currency codes using config format
+     */
+    private static boolean validateCurrency(String de, String expected, String actual, ValidationResult result, JsonNode format) {
+        try {
+            String inputFormat = format.get("input").asText();
+            String canonicalFormat = format.get("canonical").asText();
+            JsonNode mapping = format.get("mapping");
+
+            // Convert numeric code to ISO if needed
+            String expectedISO = expected;
+            if ("numeric".equals(inputFormat) && "ISO".equals(canonicalFormat)) {
+                expectedISO = mapping.has(expected) ? mapping.get(expected).asText() : expected;
+            }
+
+            if (actual.equals(expectedISO)) {
+                result.addPassedField(de, expected, actual + 
+                    String.format(" (Converted from %s to %s format)", inputFormat, canonicalFormat));
+                return true;
+            }
+
+            result.addFailedField(de, expected + 
+                String.format(" (Expected %s format: %s)", canonicalFormat, expectedISO), actual);
+            return false;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected,
+                actual + " (Failed to validate currency: " + e.getMessage() + ")");
             return false;
         }
     }
