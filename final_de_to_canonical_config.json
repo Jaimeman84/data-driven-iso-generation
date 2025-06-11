@@ -82,7 +82,13 @@
     "length": 12,
     "notes": "Required if the transaction and settlement currencies are different. Not applicable for domestic transactions.",
     "active": false,
-    "SampleData": "000000030000"
+    "SampleData": "000000030000",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true
+      }
+    }
   },
   "6": {
     "name": "Amount, Cardholder Billing",
@@ -94,7 +100,13 @@
     "length": 12,
     "notes": "Required if the cardholder and settlement currencies are different. Includes fees from MasterCard.",
     "active": false,
-    "SampleData": "000000040000"
+    "SampleData": "000000040000",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true
+      }
+    }
   },
   "7": {
     "name": "Transmission Date and Time",
@@ -125,7 +137,13 @@
     "length": 8,
     "notes": "Required only if requested by the issuer. Not expected for domestic transactions.",
     "active": false,
-    "SampleData": "01000000"
+    "SampleData": "01000000",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true
+      }
+    }
   },
   "9": {
     "name": "Conversion Rate, Settlement",
@@ -137,7 +155,13 @@
     "length": 8,
     "notes": "Required if the transaction and settlement currencies are different. Not applicable for domestic transactions.",
     "active": false,
-    "SampleData": "02000000"
+    "SampleData": "02000000",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true
+      }
+    }
   },
   "10": {
     "name": "Conversion Rate, Cardholder Billing",
@@ -149,7 +173,13 @@
     "length": 8,
     "notes": "Required if the cardholder and settlement currencies are different. Not applicable for domestic transactions.",
     "active": false,
-    "SampleData": "03000000"
+    "SampleData": "03000000",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true
+      }
+    }
   },
   "11": {
     "name": "System Trace Audit Number",
@@ -360,19 +390,26 @@
   "29": {
     "name": "Amount, Settlement Fee",
     "canonical": [
-      "transaction.settlement.fees.settlementFee"
+      "transaction.settlementFees.settlementFee.amount"
     ],
     "format": "fixed",
     "type": "alphanumeric",
     "length": 9,
     "notes": "Required if the transaction and settlement currencies are different. Not applicable for domestic transactions.",
     "active": false,
-    "SampleData": "D00000060"
+    "SampleData": "D00000060",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true
+      }
+    }
   },
   "30": {
     "name": "Amount, Transaction Processing Fee",
     "canonical": [
-      "transaction.fees.processingFee"
+      "transaction.fees.processingFee.amount",
+      "transaction.fees.processingFee.debitCreditIndicatorType"
     ],
     "format": "fixed",
     "type": "alphanumeric",
@@ -384,14 +421,21 @@
   "31": {
     "name": "Amount, Settlement Processing Fee",
     "canonical": [
-      "transaction.settlement.fees.procesingFee"
+      "transaction.settlementFees.processingFee.amount",
+      "transaction.settlementFees.processingFee.debitCreditIndicatorType"
     ],
     "format": "fixed",
     "type": "alphanumeric",
     "length": 9,
     "notes": "Required if requested by the issuer. No specific validation required.",
     "active": false,
-    "SampleData": "C00000070"
+    "SampleData": "C00000070",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true
+      }
+    }
   },
   "32": {
     "name": "Acquiring Institution Identification Code",
@@ -577,7 +621,7 @@
   "50": {
     "name": "Currency Code, Settlement",
     "canonical": [
-      "transaction.settlement.amount.currencyCode"
+      "transaction.settlement.settlementAmount.currencyCode"
     ],
     "format": "fixed",
     "type": "numeric",
@@ -589,7 +633,7 @@
   "51": {
     "name": "Currency Code, Cardholder Billing",
     "canonical": [
-      "transaction.cardHolderInfo.amount.currencyCode"
+      "transaction.cardHolderInfo.cardHolderBillingAmount.currencyCode"
     ],
     "format": "fixed",
     "type": "numeric",
