@@ -825,10 +825,45 @@ public class CreateIsoMessage  {
             String actualValue = getJsonValue(actualJson, getCanonicalPaths(de).get(0));
 
             // Remove leading zeros from expected value
-            String normalizedExpected = String.valueOf(Long.parseLong(expected));
+            String normalizedExpected = expected;
+            String debitCreditIndicator = "";
+            
+            // For DEs 28-31, handle debit/credit indicator
+            if (Arrays.asList("28", "29", "30", "31").contains(de)) {
+                // Extract first character as indicator
+                debitCreditIndicator = expected.substring(0, 1);
+                // Remove indicator for amount comparison
+                normalizedExpected = expected.substring(1);
+            }
+            
+            // Remove leading zeros
+            normalizedExpected = String.valueOf(Long.parseLong(normalizedExpected));
             String normalizedActual = actualValue;
 
-            if (normalizedExpected.equals(normalizedActual)) {
+            boolean amountMatches = normalizedExpected.equals(normalizedActual);
+            
+            // For DEs 28-31, also validate debit/credit indicator
+            if (amountMatches && !debitCreditIndicator.isEmpty() && rules.has("debitCreditIndicator")) {
+                String expectedIndicatorType = rules.get("debitCreditIndicator")
+                    .get(debitCreditIndicator).asText();
+                
+                // Get the debitCreditIndicatorType from canonical response
+                String actualIndicatorType = getJsonValue(actualJson, getCanonicalPaths(de).get(1));
+                
+                if (expectedIndicatorType.equals(actualIndicatorType)) {
+                    result.addPassedField(de, expected, 
+                        String.format("%s (Amount: %s, Type: %s)", 
+                            actualValue, normalizedActual, actualIndicatorType));
+                    return true;
+                } else {
+                    result.addFailedField(de, expected, 
+                        String.format("%s (Amount matches but expected type %s, got %s)", 
+                            actualValue, expectedIndicatorType, actualIndicatorType));
+                    return false;
+                }
+            }
+
+            if (amountMatches) {
                 result.addPassedField(de, expected, actualValue);
                 return true;
             }
