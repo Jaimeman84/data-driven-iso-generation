@@ -270,11 +270,11 @@
     "canonical": [
       "transaction.settlement.settlementConversionDate"
     ],
-    "format": "unknown",
-    "type": "alphanumeric",
-    "length": null,
+    "format": "fixed",
+    "type": "numeric",
+    "length": 4,
     "active": false,
-    "notes": ""
+    "notes": "Format: MMDD. Must be a valid date."
   },
   "17": {
     "name": "Date, Capture",
@@ -378,19 +378,32 @@
   "28": {
     "name": "Amount, Transaction Fee",
     "canonical": [
-      "transaction.fees.transactionFees"
+      "transaction.fees.transactionFees",
+      "transaction.fees.transactionFees.debitCreditIndicatorType"
     ],
     "format": "fixed",
     "type": "alphanumeric",
     "length": 9,
     "notes": "Required when DE 30 is present. Indicates surcharge, rebate, or transaction fee.",
     "active": false,
-    "SampleData": "C00000050"
+    "SampleData": "C00000050",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true,
+        "debitCreditIndicator": {
+          "D": "DEBIT_AMOUNT",
+          "0": "DEBIT_AMOUNT",
+          "C": "CREDIT_AMOUNT"
+        }
+      }
+    }
   },
   "29": {
     "name": "Amount, Settlement Fee",
     "canonical": [
-      "transaction.settlementFees.settlementFee.amount"
+      "transaction.settlementFees.settlementFee.amount",
+      "transaction.settlementFees.settlementFee.debitCreditIndicatorType"
     ],
     "format": "fixed",
     "type": "alphanumeric",
@@ -401,7 +414,12 @@
     "validation": {
       "type": "amount",
       "rules": {
-        "removeLeadingZeros": true
+        "removeLeadingZeros": true,
+        "debitCreditIndicator": {
+          "D": "DEBIT_AMOUNT",
+          "0": "DEBIT_AMOUNT",
+          "C": "CREDIT_AMOUNT"
+        }
       }
     }
   },
@@ -416,7 +434,18 @@
     "length": 9,
     "notes": "Required if requested by the issuer. No specific validation required.",
     "active": false,
-    "SampleData": "C00000070"
+    "SampleData": "C00000070",
+    "validation": {
+      "type": "amount",
+      "rules": {
+        "removeLeadingZeros": true,
+        "debitCreditIndicator": {
+          "D": "DEBIT_AMOUNT",
+          "0": "DEBIT_AMOUNT",
+          "C": "CREDIT_AMOUNT"
+        }
+      }
+    }
   },
   "31": {
     "name": "Amount, Settlement Processing Fee",
@@ -433,7 +462,12 @@
     "validation": {
       "type": "amount",
       "rules": {
-        "removeLeadingZeros": true
+        "removeLeadingZeros": true,
+        "debitCreditIndicator": {
+          "D": "DEBIT_AMOUNT",
+          "0": "DEBIT_AMOUNT",
+          "C": "CREDIT_AMOUNT"
+        }
       }
     }
   },
