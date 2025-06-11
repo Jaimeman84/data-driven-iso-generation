@@ -130,7 +130,7 @@
   "8": {
     "name": "Amount, Cardholder Billing Fee",
     "canonical": [
-      "transaction.cardHolderInfo.cardHolderFees.cardHolderfee.amount"
+      "transaction.cardHolderInfo.cardHolderFees.cardHolderFee.amount"
     ],
     "format": "fixed",
     "type": "numeric",
@@ -833,7 +833,41 @@
     "length": 42,
     "notes": "Required on inbound messages to Mastercard Networks Exchange. The remaining subelements may be zero-filled. Outbound from Mastercard Networks Exchange, the original message type is sent. Original system trace audit number and local date and time are sent if available.",
     "active": false,
-    "SampleData": "111111111111111111111111111111111111111142"
+    "SampleData": "111111111111111111111111111111111111111142",
+    "validation": {
+      "type": "original_data",
+      "rules": {
+        "positions": {
+          "messageType": {
+            "start": 1,
+            "end": 4,
+            "mapping": {
+              "0100": "AUTH_REQ",
+              "0200": "FIN_REQ"
+            }
+          },
+          "systemTraceAuditNumber": {
+            "start": 5,
+            "end": 10,
+            "removeLeadingZeros": true
+          },
+          "transmissionDateTime": {
+            "start": 11,
+            "end": 20
+          },
+          "acquirerId": {
+            "start": 21,
+            "end": 31,
+            "removeLeadingZeros": true
+          },
+          "forwardingInstitutionId": {
+            "start": 32,
+            "end": 42,
+            "removeLeadingZeros": true
+          }
+        }
+      }
+    }
   },
   "95": {
     "name": "Replacement Amounts",

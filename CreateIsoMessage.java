@@ -802,6 +802,8 @@ public class CreateIsoMessage  {
                         }
                     case "pos_entry_mode":
                         return validatePosEntryMode(de, expected, actual, result);
+                    case "original_data":
+                        return validateOriginalData(de, expected, actual, result, validation.get("rules"));
                 }
             }
         }
@@ -1419,6 +1421,72 @@ public class CreateIsoMessage  {
             }
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to validate POS entry mode: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Validates original data elements (DE 90) with position-based validation
+     */
+    private static boolean validateOriginalData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            JsonNode actualJson = objectMapper.readTree(actual);
+            JsonNode positions = rules.get("positions");
+            boolean allValid = true;
+            StringBuilder validationDetails = new StringBuilder();
+            
+            // Validate Message Type (positions 1-4)
+            String messageType = expected.substring(0, 4);
+            String expectedType = positions.get("messageType").get("mapping").get(messageType).asText();
+            String actualType = getJsonValue(actualJson, "transaction.originalTransaction.transactionType");
+            boolean messageTypeValid = expectedType.equals(actualType);
+            validationDetails.append(String.format("Message Type: %s->%s (%s), ", 
+                messageType, expectedType, messageTypeValid ? "✓" : "✗"));
+            allValid &= messageTypeValid;
+
+            // Validate System Trace Audit Number (positions 5-10)
+            String stan = expected.substring(4, 10).replaceFirst("^0+", ""); // Remove leading zeros
+            String actualStan = getJsonValue(actualJson, "transaction.originalTransaction.systemTraceAuditNumber");
+            boolean stanValid = stan.equals(actualStan);
+            validationDetails.append(String.format("STAN: %s (%s), ", 
+                stan, stanValid ? "✓" : "✗"));
+            allValid &= stanValid;
+
+            // Validate Transmission Date Time (positions 11-20)
+            String dateTime = expected.substring(10, 20);
+            String actualDateTime = getJsonValue(actualJson, "transaction.originalTransaction.transmissionDateTime");
+            boolean dateTimeValid = dateTime.equals(actualDateTime);
+            validationDetails.append(String.format("DateTime: %s (%s), ", 
+                dateTime, dateTimeValid ? "✓" : "✗"));
+            allValid &= dateTimeValid;
+
+            // Validate Acquirer ID (positions 21-31)
+            String acquirerId = expected.substring(20, 31).replaceFirst("^0+", ""); // Remove leading zeros
+            String actualAcquirerId = getJsonValue(actualJson, "transaction.originalTransaction.acquirer.acquirerId");
+            boolean acquirerIdValid = acquirerId.equals(actualAcquirerId);
+            validationDetails.append(String.format("AcquirerID: %s (%s), ", 
+                acquirerId, acquirerIdValid ? "✓" : "✗"));
+            allValid &= acquirerIdValid;
+
+            // Validate Forwarding Institution ID (positions 32-42)
+            String forwardingId = expected.substring(31, 42).replaceFirst("^0+", ""); // Remove leading zeros
+            String actualForwardingId = getJsonValue(actualJson, "transaction.originalTransaction.forwardingInstitution.forwardingInstitutionId");
+            boolean forwardingIdValid = forwardingId.equals(actualForwardingId);
+            validationDetails.append(String.format("ForwardingID: %s (%s)", 
+                forwardingId, forwardingIdValid ? "✓" : "✗"));
+            allValid &= forwardingIdValid;
+
+            // Add validation result with detailed breakdown
+            if (allValid) {
+                result.addPassedField(de, expected, validationDetails.toString());
+            } else {
+                result.addFailedField(de, expected, validationDetails.toString());
+            }
+            return allValid;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected,
+                "Failed to validate original data elements: " + e.getMessage());
             return false;
         }
     }
