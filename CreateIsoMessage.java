@@ -1071,17 +1071,36 @@ public class CreateIsoMessage  {
     }
 
     /**
-     * Helper method to safely get value from JSON path
+     * Helper method to safely get value from JSON path, with case-insensitive field matching
      */
     private static String getJsonValue(JsonNode node, String path) {
         try {
             String[] parts = path.split("\\.");
             JsonNode current = node;
             for (String part : parts) {
-                current = current.path(part);
+                // Try exact match first
+                JsonNode next = current.path(part);
+                if (next.isMissingNode()) {
+                    // If not found, try case-insensitive match
+                    Iterator<String> fieldNames = current.fieldNames();
+                    boolean found = false;
+                    while (fieldNames.hasNext()) {
+                        String fieldName = fieldNames.next();
+                        if (fieldName.equalsIgnoreCase(part)) {
+                            next = current.path(fieldName);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        return ""; // Path not found
+                    }
+                }
+                current = next;
             }
             return current.isNull() ? "" : current.asText().trim();
         } catch (Exception e) {
+            System.out.println("Warning: Error getting JSON value for path " + path + ": " + e.getMessage());
             return "";
         }
     }

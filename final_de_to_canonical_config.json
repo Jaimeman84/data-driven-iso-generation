@@ -402,8 +402,8 @@
   "29": {
     "name": "Amount, Settlement Fee",
     "canonical": [
-      "transaction.settlementFees.settlementFee.amount",
-      "transaction.settlementFees.settlementFee.debitCreditIndicatorType"
+      "transaction.settlement.settlementFees.settlementFee.amount",
+      "transaction.settlement.settlementFees.settlementFee.debitCreditIndicatorType"
     ],
     "format": "fixed",
     "type": "alphanumeric",
@@ -450,8 +450,8 @@
   "31": {
     "name": "Amount, Settlement Processing Fee",
     "canonical": [
-      "transaction.settlementFees.processingFee.amount",
-      "transaction.settlementFees.processingFee.debitCreditIndicatorType"
+      "transaction.settlement.settlementFees.processingFee.amount",
+      "transaction.settlement.settlementFees.processingFee.debitCreditIndicatorType"
     ],
     "format": "fixed",
     "type": "alphanumeric",
@@ -633,7 +633,7 @@
   "49": {
     "name": "Currency Code, Transaction",
     "canonical": [
-      "transaction.amount.currencyCode"
+      "transaction.transactionAmount.currencyCode"
     ],
     "format": "fixed",
     "type": "numeric",
