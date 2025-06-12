@@ -13,6 +13,7 @@ import java.util.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.math.BigDecimal;
+import java.util.stream.Collectors;
 
 import static utilities.CustomTestData.generateCustomValue;
 import static utilities.CustomTestData.generateRandomText;
@@ -598,11 +599,31 @@ public class CreateIsoMessage  {
 
                         // Write validation results to the spreadsheet
                         Cell validationCell = dataRow.createCell(83); // Column CF
+                        long passCount = validationResult.getResults().values().stream()
+                            .filter(r -> r.getStatus() == FieldStatus.PASSED).count();
+                        long failCount = validationResult.getResults().values().stream()
+                            .filter(r -> r.getStatus() == FieldStatus.FAILED).count();
+                        long skipCount = validationResult.getResults().values().stream()
+                            .filter(r -> r.getStatus() == FieldStatus.SKIPPED).count();
+
+                        // Get failed and skipped DEs
+                        String failedDEs = validationResult.getResults().entrySet().stream()
+                            .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
+                            .map(Map.Entry::getKey)
+                            .collect(Collectors.joining(", "));
+                        String skippedDEs = validationResult.getResults().entrySet().stream()
+                            .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                            .map(Map.Entry::getKey)
+                            .collect(Collectors.joining(", "));
+
                         String validationSummary = String.format(
-                            "Passed: %d, Failed: %d, Skipped: %d", 
-                            validationResult.getResults().values().stream().filter(r -> r.getStatus() == FieldStatus.PASSED).count(),
-                            validationResult.getResults().values().stream().filter(r -> r.getStatus() == FieldStatus.FAILED).count(),
-                            validationResult.getResults().values().stream().filter(r -> r.getStatus() == FieldStatus.SKIPPED).count()
+                            "Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
+                            validationResult.getResults().size(),
+                            passCount,
+                            failCount,
+                            failCount > 0 ? " (DE " + failedDEs + ")" : "",
+                            skipCount,
+                            skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
                         );
                         validationCell.setCellValue(validationSummary);
                     } catch (Exception e) {

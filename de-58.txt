@@ -1,0 +1,182 @@
+/*
+* Represents a National POS (Point of Sale) Condition Code entry.
+* This message encapsulates various attributes related to a terminal transaction.
+*/
+message NationalPOSConditionCode{
+  TerminalClass terminalClass = 1;                      // Represents details about the terminal's classification, including its operation,location, and attendance status.
+  PresentationType presentationType = 2;                // Defines how the transaction was presented, including factors like cardholder presence, card presence, and transaction status.
+  SecurityCondition securityCondition = 3;              // Indicates the security condition associated with the transaction.
+  TerminalType terminalType = 4;                        // Identifies the type of terminal used in the transaction, such as POS,ATM, mobile payment device, or self-service terminal.
+  CardDataInputCapability cardDataInputCapability = 5;  // Describes the method by which card data was input at the terminal.
+}
+
+/**
+* Represents the classification of a terminal in a transaction.
+*/
+message TerminalClass{
+  AttendanceIndicator attendanceIndicator = 1;          // Indicates whether the terminal is attended or unattended.
+  TerminalOperation terminalOperation = 2;              // Represents the type of operation performed at the terminal.
+  TerminalLocation terminalLocation = 3;                // Indicates the location of the terminal.
+}
+
+
+/**
+* Represents how a card transaction is presented in a payment system.
+*/
+message PresentationType{
+  CardholderPresence cardholderPresence = 1;            // Indicates whether the cardholder was present during the transaction.
+  CardPresence cardPresence = 2;                        // Specifies whether the physical card was present during the transaction.
+  CardRetentionCapability cardRetentionCapability = 3;  // Represents the terminal's ability to retain the card after reading.
+  TransactionStatus transactionStatus = 4;              // Defines the status of the transaction in its lifecycle.
+}
+
+
+/**
+* Defines the security condition of a transaction.
+*/
+enum SecurityCondition {
+   SECURITY_CONDITION_UNKNOWN = 0;
+   NO_SECURITY_CONCERN = 1;                              // No security concerns detected in the transaction.
+   SUSPECTED_FRAUD = 2;                                  // The transaction is suspected to be fraudulent.
+   IDENTIFICATION_VERIFIED = 3;                          // Cardholder identification has been successfully verified.
+   DIGITAL_SIGNATURE_TRANSACTION = 4;                    // Transaction is secured using a digital signature.
+   NON_SECURE_UNKNOWN_TRANSACTION = 5;                   // The security status of the transaction is unknown or considered non-secure.
+   SECURE_TRANSACTION_WITH_CARDHOLDER_CERT = 6;          // Transaction is secured with cardholder authentication credentials.
+   SECURE_TRANSACTION_WITHOUT_CARDHOLDER_CERT = 7;       // Transaction is secured without cardholder authentication credentials.
+   CHANNEL_ENCRYPTED_ECOMMERCE = 8;                      // E-commerce transaction secured via encrypted communication.
+   CVC_CVV_VALIDATED_VALID = 9;                          // Card security code (CVC/CVV) validation passed successfully.
+   CVC_CVV_VALIDATED_INVALID = 10;                        // Card security code (CVC/CVV) validation failed.
+   INTERNET_PINNED_DEBIT_TRANSACTION = 11;               // Internet-based debit transaction verified using PIN authentication.
+   SECURE_REMOTE_COMMERCE_SRC = 12;                      // Secure remote commerce transaction type.
+}
+
+
+
+/**
+* Defines the attendance condition of a terminal during a transaction.
+*/
+enum AttendanceIndicator{
+  ATTENDED = 0;                                        // Terminal attended
+  UNATTENDED = 1;                                      // Terminal unattended
+  RESERVED = 2;                                        // Reserved
+}
+
+/**
+* Defines the type of operation performed at the terminal.
+*/
+enum TerminalOperation{
+  CUSTOMER_OPERATED = 0;                               // Customer-operated terminal
+  CARD_ACCEPTOR_OPERATED = 1;                          // Merchant/staff-operated terminal
+  ADMINISTRATIVE = 2;                                  // Administrative operation
+  TERMINAL_OPERATION_RESERVED = 3;                     // Reserved
+}
+/**
+* Represents the location of a terminal.
+*/
+enum TerminalLocation{
+  ON_PREMISE = 0;                                      // Terminal located on-premise
+  OFF_PREMISE = 1;                                     // Terminal located off-premise
+  TERMINAL_LOCATION_RESERVED = 2;                      // Reserved
+}
+
+/**
+* Defines the presence of the cardholder during a transaction.
+*/
+enum CardholderPresence{
+  CUSTOMER_PRESENT = 0;                                // Cardholder is present at the time of the transaction
+  CUSTOMER_NOT_PRESENT = 1;                            // Cardholder is not present during the transaction
+  MAIL_OR_FACSIMILE_ORDER = 2;                         // Transaction made via mail
+  TELEPHONE_ORDER = 3;                                 // Transaction conducted over the phone
+  STANDING_ORDER_OR_RECURRING_PAYMENT = 4;             // Recurring payment
+  CARD_HOLDER_PRESENCE_RESERVED = 5;                   // Reserved
+  CARD_HOLDER_PRESENCE_PRE_AUTHORIZED_PURCHASE = 6;    // Pre-authorized
+  DEFERRED_BILLING = 7;                                // Deferred billing
+  DEFERRED_AUTHORIZATION = 8;                          // Deferred authorization
+  INSTALLMENT_PAYMENT = 9;                             // Installment payment
+}
+
+/**
+* Defines whether the physical card was present during a transaction.
+*/
+enum CardPresence {
+  CARD_PRESENT = 0;                                     // Card was present
+  CARD_NOT_PRESENT = 1;                                 // Card was not present
+  CARD_PRESENCE_RESERVED = 2;                           // Reserved
+  PRE_AUTHORIZED_PURCHASE = 3;                          // Pre-authorized purchase
+}
+
+/**
+* Defines the card retention capability of a terminal.
+*/
+enum CardRetentionCapability {
+  NO_CARD_RETENTION = 0;                                // No card retention
+  HAS_CARD_RETENTION = 1;                               // Terminal retains card
+  CARD_RETENTION_CAPABILITY_RESERVED = 2;               // Reserved
+}
+
+/**
+* Represents the status of a transaction in its lifecycle.
+*/
+enum TransactionStatus {
+  ORIGINAL_PRESENTMENT = 0;                              // Initial transaction
+  FIRST_REPRESENTMENT = 1;                               // First representment
+  SECOND_REPRESENTMENT = 2;                              // Second representment
+  THIRD_REPRESENTMENT = 3;                               // Third representment
+  PREVIOUSLY_AUTHORIZED_REQUEST = 4;                     // Previously authorized request
+  RESUBMISSION = 5;                                      // Transaction resubmission
+  TRANSACTION_STATUS_RESERVED = 6;                       // Reserved
+  ACCOUNT_INQUIRY = 7;                                   // Account inquiry request
+}
+
+/**
+* Defines different types of terminals used in transactions.
+*/
+enum TerminalType {
+   TERMINAL_TYPE_UNKNOWN = 0;
+   ADMINISTRATIVE_TERMINAL = 1;                           // Administrative terminal
+   POS_TERMINAL = 2;                                      // Point of Sale terminal
+   ATM = 3;                                               // ATM
+   HOME_TERMINAL = 4;                                     // Home terminal
+   ELECTRONIC_CASH_REGISTER = 5;                          // Cash register terminal
+   DIAL_UP_TELEPHONE_TERMINAL = 6;                        // Telephone-based terminal
+   TRAVELERS_CHECK_MACHINE = 7;                           // Travelers check machine
+   AUTOMATED_FUEL_DEVICE = 8;                             // Fuel terminal
+   SCRIP_MACHINE = 9;                                     // Scrip terminal
+   COUPON_MACHINE = 10;                                    // Coupon transaction terminal
+   TICKET_MACHINE = 11;                                   // Ticket issuing terminal
+   POINT_OF_BANKING_TERMINAL = 12;                        // Banking terminal
+   TELLER = 13;                                           // Bank terminal
+   FRANCHISE_TELLER = 14;                                 // Franchise terminal
+   PERSONAL_BANKING = 15;                                 // Personal banking terminal
+   PUBLIC_UTILITY = 16;                                   // Utility payment terminal
+   VENDING = 17;                                          // Vending machine terminal
+   SELF_SERVICE = 18;                                     // Self-service terminal
+   AUTHORIZATION = 19;                                    // Authorization terminal
+   PAYMENT = 20;                                          // Payment processing terminal
+   VRU = 21;                                              // Voice response unit
+   SMARTPHONE_POS_DEVICE = 22;                            // Mobile POS device
+   INTERACTIVE_TELEVISION = 23;                           // TV-based payment terminal
+   PDA = 24;                                              // Personal Digital Assistant terminal
+   SCREEN_PHONE = 25;                                     // Screen-based telephone payment
+   ELECTRONIC_COMMERCE = 26;                              // Online transaction terminal
+   MICR_TERMINALS_POS = 27;                               // MICR-based POS terminal
+}
+
+/**
+* Defines the methods by which card data can be input into a terminal.
+*/
+enum CardDataInputCapability {
+   CARD_DATA_INPUT_CAPABILITY_UNKNOWN = 0;                 // Unknown method
+   MANUAL_NO_TERMINAL = 1;                                 // Manual entry without terminal
+   MAGNETIC_STRIPE = 2;                                    // Magnetic stripe card reading
+   BARCODE_QRCODE = 3;                                     // Barcode or QR code scanning
+   OCR = 4;                                                // Optical character recognition
+   ICC_CHIP = 5;                                           // Chip-based card processing
+   KEY_ENTRY = 6;                                          // Manual key entry
+   FILE = 7;                                               // File-based card input
+   CONTACTLESS_MAG_STRIPE_KEY_ENTRY = 8;                   // Contactless mag stripe key entry
+   CONTACTLESS_CHIP_MAG_STRIPE_ICC_KEY_ENTRY = 9;          // Contactless chip/mag stripe/ICC entry
+   MAG_STRIPE_KEY_ENTRY = 10;                              // Mag stripe key entry
+   MAG_STRIPE_KEY_ENTRY_EMV_ICC = 11;                      // Mag stripe key entry with EMV ICC
+   MAG_STRIPE_EMV_ICC = 12;                                // Mag stripe with EMV ICC authentication
+   SECURE_CARD_LESS_ENTRY = 13;                            // Secure card-less transaction
