@@ -804,6 +804,8 @@ public class CreateIsoMessage  {
                         return validatePosEntryMode(de, expected, actual, result);
                     case "original_data":
                         return validateOriginalData(de, expected, actual, result, validation.get("rules"));
+                    case "pos_condition_code":
+                        return validatePosConditionCode(de, expected, actual, result, validation.get("rules"));
                 }
             }
         }
@@ -1488,6 +1490,235 @@ public class CreateIsoMessage  {
             result.addFailedField(de, expected,
                 "Failed to validate original data elements: " + e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Validates POS condition code (DE 58) with position-based validation
+     */
+    private static boolean validatePosConditionCode(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            JsonNode actualJson = objectMapper.readTree(actual);
+            JsonNode positions = rules.get("positions");
+            boolean allValid = true;
+            StringBuilder validationDetails = new StringBuilder();
+            
+            // Validate Terminal Class (positions 1-3)
+            JsonNode terminalClass = positions.get("terminalClass");
+            String terminalClassValue = expected.substring(
+                terminalClass.get("start").asInt() - 1, 
+                terminalClass.get("end").asInt()
+            );
+            
+            // Validate each terminal class component with enum mappings
+            JsonNode components = terminalClass.get("components");
+            
+            // AttendanceIndicator (position 1)
+            Map<String, String> attendanceMapping = new HashMap<>();
+            attendanceMapping.put("0", "ATTENDED");
+            attendanceMapping.put("1", "UNATTENDED");
+            attendanceMapping.put("2", "RESERVED");
+            validateComponentWithMapping(components.get("attendanceIndicator"), terminalClassValue.substring(0, 1),
+                actualJson, "transaction.nationalPOSConditionCode.terminalClass.AttendanceIndicator",
+                "Attendance", validationDetails, allValid, attendanceMapping);
+            
+            // TerminalOperation (position 2)
+            Map<String, String> operationMapping = new HashMap<>();
+            operationMapping.put("0", "CUSTOMER_OPERATED");
+            operationMapping.put("1", "CARD_ACCEPTOR_OPERATED");
+            operationMapping.put("2", "ADMINISTRATIVE");
+            operationMapping.put("3", "TERMINAL_OPERATION_RESERVED");
+            validateComponentWithMapping(components.get("terminalOperation"), terminalClassValue.substring(1, 2),
+                actualJson, "transaction.nationalPOSConditionCode.terminalClass.terminalOperation",
+                "Operation", validationDetails, allValid, operationMapping);
+            
+            // TerminalLocation (position 3)
+            Map<String, String> locationMapping = new HashMap<>();
+            locationMapping.put("0", "ON_PREMISE");
+            locationMapping.put("1", "OFF_PREMISE");
+            locationMapping.put("2", "TERMINAL_LOCATION_RESERVED");
+            validateComponentWithMapping(components.get("terminalLocation"), terminalClassValue.substring(2, 3),
+                actualJson, "transaction.nationalPOSConditionCode.terminalClass.terminalLocation",
+                "Location", validationDetails, allValid, locationMapping);
+
+            // Validate Presentation Type (positions 4-7)
+            JsonNode presentationType = positions.get("presentationType");
+            String presentationValue = expected.substring(
+                presentationType.get("start").asInt() - 1,
+                presentationType.get("end").asInt()
+            );
+            
+            components = presentationType.get("components");
+            
+            // CardholderPresence (position 4)
+            Map<String, String> cardholderPresenceMapping = new HashMap<>();
+            cardholderPresenceMapping.put("0", "CUSTOMER_PRESENT");
+            cardholderPresenceMapping.put("1", "CUSTOMER_NOT_PRESENT");
+            cardholderPresenceMapping.put("2", "MAIL_OR_FACSIMILE_ORDER");
+            cardholderPresenceMapping.put("3", "TELEPHONE_ORDER");
+            cardholderPresenceMapping.put("4", "STANDING_ORDER_OR_RECURRING_PAYMENT");
+            cardholderPresenceMapping.put("5", "CARD_HOLDER_PRESENCE_RESERVED");
+            cardholderPresenceMapping.put("6", "CARD_HOLDER_PRESENCE_PRE_AUTHORIZED_PURCHASE");
+            cardholderPresenceMapping.put("7", "DEFERRED_BILLING");
+            cardholderPresenceMapping.put("8", "DEFERRED_AUTHORIZATION");
+            cardholderPresenceMapping.put("9", "INSTALLMENT_PAYMENT");
+            validateComponentWithMapping(components.get("cardHolderPresence"), presentationValue.substring(0, 1),
+                actualJson, "transaction.nationalPOSConditionCode.presentationType.cardHolderPresence",
+                "CardholderPresence", validationDetails, allValid, cardholderPresenceMapping);
+            
+            // CardPresence (position 5)
+            Map<String, String> cardPresenceMapping = new HashMap<>();
+            cardPresenceMapping.put("0", "CARD_PRESENT");
+            cardPresenceMapping.put("1", "CARD_NOT_PRESENT");
+            cardPresenceMapping.put("2", "CARD_PRESENCE_RESERVED");
+            cardPresenceMapping.put("3", "PRE_AUTHORIZED_PURCHASE");
+            validateComponentWithMapping(components.get("cardPresence"), presentationValue.substring(1, 2),
+                actualJson, "transaction.nationalPOSConditionCode.presentationType.cardPresence",
+                "CardPresence", validationDetails, allValid, cardPresenceMapping);
+            
+            // CardRetentionCapability (position 6)
+            Map<String, String> retentionMapping = new HashMap<>();
+            retentionMapping.put("0", "NO_CARD_RETENTION");
+            retentionMapping.put("1", "HAS_CARD_RETENTION");
+            retentionMapping.put("2", "CARD_RETENTION_CAPABILITY_RESERVED");
+            validateComponentWithMapping(components.get("cardRetentionCapability"), presentationValue.substring(2, 3),
+                actualJson, "transaction.nationalPOSConditionCode.presentationType.cardRetentionCapability",
+                "RetentionCapability", validationDetails, allValid, retentionMapping);
+            
+            // TransactionStatus (position 7)
+            Map<String, String> transactionStatusMapping = new HashMap<>();
+            transactionStatusMapping.put("0", "ORIGINAL_PRESENTMENT");
+            transactionStatusMapping.put("1", "FIRST_REPRESENTMENT");
+            transactionStatusMapping.put("2", "SECOND_REPRESENTMENT");
+            transactionStatusMapping.put("3", "THIRD_REPRESENTMENT");
+            transactionStatusMapping.put("4", "PREVIOUSLY_AUTHORIZED_REQUEST");
+            transactionStatusMapping.put("5", "RESUBMISSION");
+            transactionStatusMapping.put("6", "TRANSACTION_STATUS_RESERVED");
+            transactionStatusMapping.put("7", "ACCOUNT_INQUIRY");
+            validateComponentWithMapping(components.get("transactionStatus"), presentationValue.substring(3, 4),
+                actualJson, "transaction.nationalPOSConditionCode.presentationType.transactionStatus",
+                "TransactionStatus", validationDetails, allValid, transactionStatusMapping);
+
+            // Validate Security Condition (position 8)
+            JsonNode securityCondition = positions.get("securityCondition");
+            String securityValue = expected.substring(
+                securityCondition.get("position").asInt() - 1,
+                securityCondition.get("position").asInt()
+            );
+            Map<String, String> securityMapping = new HashMap<>();
+            securityMapping.put("0", "SECURITY_CONDITION_UNKNOWN");
+            securityMapping.put("1", "NO_SECURITY_CONCERN");
+            securityMapping.put("2", "SUSPECTED_FRAUD");
+            securityMapping.put("3", "IDENTIFICATION_VERIFIED");
+            securityMapping.put("4", "DIGITAL_SIGNATURE_TRANSACTION");
+            securityMapping.put("5", "NON_SECURE_UNKNOWN_TRANSACTION");
+            securityMapping.put("6", "SECURE_TRANSACTION_WITH_CARDHOLDER_CERT");
+            securityMapping.put("7", "SECURE_TRANSACTION_WITHOUT_CARDHOLDER_CERT");
+            securityMapping.put("8", "CHANNEL_ENCRYPTED_ECOMMERCE");
+            securityMapping.put("9", "CVC_CVV_VALIDATED_VALID");
+            securityMapping.put("10", "CVC_CVV_VALIDATED_INVALID");
+            securityMapping.put("11", "INTERNET_PINNED_DEBIT_TRANSACTION");
+            securityMapping.put("12", "SECURE_REMOTE_COMMERCE_SRC");
+            validateComponentWithMapping(securityCondition, securityValue,
+                actualJson, "transaction.nationalPOSConditionCode.SecurityCondition",
+                "Security", validationDetails, allValid, securityMapping);
+
+            // Validate Terminal Type (positions 9-10)
+            JsonNode terminalType = positions.get("terminalType");
+            String terminalTypeValue = expected.substring(
+                terminalType.get("start").asInt() - 1,
+                terminalType.get("end").asInt()
+            );
+            Map<String, String> terminalTypeMapping = new HashMap<>();
+            terminalTypeMapping.put("00", "TERMINAL_TYPE_UNKNOWN");
+            terminalTypeMapping.put("01", "ADMINISTRATIVE_TERMINAL");
+            terminalTypeMapping.put("02", "POS_TERMINAL");
+            terminalTypeMapping.put("03", "ATM");
+            terminalTypeMapping.put("04", "HOME_TERMINAL");
+            terminalTypeMapping.put("05", "ELECTRONIC_CASH_REGISTER");
+            terminalTypeMapping.put("06", "DIAL_UP_TELEPHONE_TERMINAL");
+            terminalTypeMapping.put("07", "TRAVELERS_CHECK_MACHINE");
+            terminalTypeMapping.put("08", "AUTOMATED_FUEL_DEVICE");
+            terminalTypeMapping.put("09", "SCRIP_MACHINE");
+            terminalTypeMapping.put("10", "COUPON_MACHINE");
+            terminalTypeMapping.put("11", "TICKET_MACHINE");
+            terminalTypeMapping.put("12", "POINT_OF_BANKING_TERMINAL");
+            terminalTypeMapping.put("13", "TELLER");
+            terminalTypeMapping.put("14", "FRANCHISE_TELLER");
+            terminalTypeMapping.put("15", "PERSONAL_BANKING");
+            terminalTypeMapping.put("16", "PUBLIC_UTILITY");
+            terminalTypeMapping.put("17", "VENDING");
+            terminalTypeMapping.put("18", "SELF_SERVICE");
+            terminalTypeMapping.put("19", "AUTHORIZATION");
+            terminalTypeMapping.put("20", "PAYMENT");
+            terminalTypeMapping.put("21", "VRU");
+            terminalTypeMapping.put("22", "SMARTPHONE_POS_DEVICE");
+            terminalTypeMapping.put("23", "INTERACTIVE_TELEVISION");
+            terminalTypeMapping.put("24", "PDA");
+            terminalTypeMapping.put("25", "SCREEN_PHONE");
+            terminalTypeMapping.put("26", "ELECTRONIC_COMMERCE");
+            terminalTypeMapping.put("27", "MICR_TERMINALS_POS");
+            validateComponentWithMapping(terminalType, terminalTypeValue,
+                actualJson, "transaction.nationalPOSConditionCode.terminalType",
+                "TerminalType", validationDetails, allValid, terminalTypeMapping);
+
+            // Validate Card Data Input Capability (position 11)
+            JsonNode cardDataInput = positions.get("cardDataInputCapability");
+            String cardDataValue = expected.substring(
+                cardDataInput.get("position").asInt() - 1,
+                cardDataInput.get("position").asInt()
+            );
+            Map<String, String> cardDataMapping = new HashMap<>();
+            cardDataMapping.put("0", "CARD_DATA_INPUT_CAPABILITY_UNKNOWN");
+            cardDataMapping.put("1", "MANUAL_NO_TERMINAL");
+            cardDataMapping.put("2", "MAGNETIC_STRIPE");
+            cardDataMapping.put("3", "BARCODE_QRCODE");
+            cardDataMapping.put("4", "OCR");
+            cardDataMapping.put("5", "ICC_CHIP");
+            cardDataMapping.put("6", "KEY_ENTRY");
+            cardDataMapping.put("7", "FILE");
+            cardDataMapping.put("8", "CONTACTLESS_MAG_STRIPE_KEY_ENTRY");
+            cardDataMapping.put("9", "CONTACTLESS_CHIP_MAG_STRIPE_ICC_KEY_ENTRY");
+            cardDataMapping.put("10", "MAG_STRIPE_KEY_ENTRY");
+            cardDataMapping.put("11", "MAG_STRIPE_KEY_ENTRY_EMV_ICC");
+            cardDataMapping.put("12", "MAG_STRIPE_EMV_ICC");
+            cardDataMapping.put("13", "SECURE_CARD_LESS_ENTRY");
+            validateComponentWithMapping(cardDataInput, cardDataValue,
+                actualJson, "transaction.nationalPOSConditionCode.cardDataInputCapability",
+                "InputCapability", validationDetails, allValid, cardDataMapping);
+
+            // Add validation result with detailed breakdown
+            if (allValid) {
+                result.addPassedField(de, expected, validationDetails.toString());
+            } else {
+                result.addFailedField(de, expected, validationDetails.toString());
+            }
+            return allValid;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected,
+                "Failed to validate POS condition code: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Helper method to validate a single component with enum mapping
+     */
+    private static void validateComponentWithMapping(JsonNode component, String value,
+            JsonNode actualJson, String canonicalPath, String componentName,
+            StringBuilder details, boolean allValid, Map<String, String> mapping) {
+        try {
+            String actualValue = getJsonValue(actualJson, canonicalPath);
+            String expectedValue = mapping.getOrDefault(value, value);
+            
+            boolean isValid = expectedValue.equals(actualValue);
+            allValid &= isValid;
+            details.append(String.format("%s: %s->%s (%s), ",
+                componentName, value, expectedValue, isValid ? "✓" : "✗"));
+        } catch (Exception e) {
+            allValid = false;
+            details.append(String.format("%s: Error (%s), ", componentName, e.getMessage()));
         }
     }
 

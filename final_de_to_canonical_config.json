@@ -378,7 +378,7 @@
   "28": {
     "name": "Amount, Transaction Fee",
     "canonical": [
-      "transaction.fees.transactionFees",
+      "transaction.fees.transactionFees.amount",
       "transaction.fees.transactionFees.debitCreditIndicatorType"
     ],
     "format": "fixed",
@@ -742,7 +742,167 @@
     "notes": "Provides details about transaction conditions. Subfields include Terminal Class, Presentation Type, Security Condition, etc.",
     "max_length": 30,
     "active": false,
-    "SampleData": "010ABC11MAX30"
+    "SampleData": "010ABC11MAX30",
+    "validation": {
+      "type": "pos_condition_code",
+      "rules": {
+        "positions": {
+          "terminalClass": {
+            "start": 1,
+            "end": 3,
+            "components": {
+              "attendanceIndicator": {
+                "position": 1,
+                "mapping": {
+                  "0": "ATTENDED",
+                  "1": "UNATTENDED",
+                  "2": "RESERVED"
+                }
+              },
+              "terminalOperation": {
+                "position": 2,
+                "mapping": {
+                  "0": "CUSTOMER_OPERATED",
+                  "1": "CARD_ACCEPTOR_OPERATED",
+                  "2": "ADMINISTRATIVE",
+                  "3": "TERMINAL_OPERATION_RESERVED"
+                }
+              },
+              "terminalLocation": {
+                "position": 3,
+                "mapping": {
+                  "0": "ON_PREMISE",
+                  "1": "OFF_PREMISE",
+                  "2": "TERMINAL_LOCATION_RESERVED"
+                }
+              }
+            }
+          },
+          "presentationType": {
+            "start": 4,
+            "end": 7,
+            "components": {
+              "cardHolderPresence": {
+                "position": 4,
+                "mapping": {
+                  "0": "CUSTOMER_PRESENT",
+                  "1": "CUSTOMER_NOT_PRESENT",
+                  "2": "MAIL_OR_FACSIMILE_ORDER",
+                  "3": "TELEPHONE_ORDER",
+                  "4": "STANDING_ORDER_OR_RECURRING_PAYMENT",
+                  "5": "CARD_HOLDER_PRESENCE_RESERVED",
+                  "6": "CARD_HOLDER_PRESENCE_PRE_AUTHORIZED_PURCHASE",
+                  "7": "DEFERRED_BILLING",
+                  "8": "DEFERRED_AUTHORIZATION",
+                  "9": "INSTALLMENT_PAYMENT"
+                }
+              },
+              "cardPresence": {
+                "position": 5,
+                "mapping": {
+                  "0": "CARD_PRESENT",
+                  "1": "CARD_NOT_PRESENT",
+                  "2": "CARD_PRESENCE_RESERVED",
+                  "3": "PRE_AUTHORIZED_PURCHASE"
+                }
+              },
+              "cardRetentionCapability": {
+                "position": 6,
+                "mapping": {
+                  "0": "NO_CARD_RETENTION",
+                  "1": "HAS_CARD_RETENTION",
+                  "2": "CARD_RETENTION_CAPABILITY_RESERVED"
+                }
+              },
+              "transactionStatus": {
+                "position": 7,
+                "mapping": {
+                  "0": "ORIGINAL_PRESENTMENT",
+                  "1": "FIRST_REPRESENTMENT",
+                  "2": "SECOND_REPRESENTMENT",
+                  "3": "THIRD_REPRESENTMENT",
+                  "4": "PREVIOUSLY_AUTHORIZED_REQUEST",
+                  "5": "RESUBMISSION",
+                  "6": "TRANSACTION_STATUS_RESERVED",
+                  "7": "ACCOUNT_INQUIRY"
+                }
+              }
+            }
+          },
+          "securityCondition": {
+            "position": 8,
+            "mapping": {
+              "0": "SECURITY_CONDITION_UNKNOWN",
+              "1": "NO_SECURITY_CONCERN",
+              "2": "SUSPECTED_FRAUD",
+              "3": "IDENTIFICATION_VERIFIED",
+              "4": "DIGITAL_SIGNATURE_TRANSACTION",
+              "5": "NON_SECURE_UNKNOWN_TRANSACTION",
+              "6": "SECURE_TRANSACTION_WITH_CARDHOLDER_CERT",
+              "7": "SECURE_TRANSACTION_WITHOUT_CARDHOLDER_CERT",
+              "8": "CHANNEL_ENCRYPTED_ECOMMERCE",
+              "9": "CVC_CVV_VALIDATED_VALID",
+              "10": "CVC_CVV_VALIDATED_INVALID",
+              "11": "INTERNET_PINNED_DEBIT_TRANSACTION",
+              "12": "SECURE_REMOTE_COMMERCE_SRC"
+            }
+          },
+          "terminalType": {
+            "start": 9,
+            "end": 10,
+            "mapping": {
+              "00": "TERMINAL_TYPE_UNKNOWN",
+              "01": "ADMINISTRATIVE_TERMINAL",
+              "02": "POS_TERMINAL",
+              "03": "ATM",
+              "04": "HOME_TERMINAL",
+              "05": "ELECTRONIC_CASH_REGISTER",
+              "06": "DIAL_UP_TELEPHONE_TERMINAL",
+              "07": "TRAVELERS_CHECK_MACHINE",
+              "08": "AUTOMATED_FUEL_DEVICE",
+              "09": "SCRIP_MACHINE",
+              "10": "COUPON_MACHINE",
+              "11": "TICKET_MACHINE",
+              "12": "POINT_OF_BANKING_TERMINAL",
+              "13": "TELLER",
+              "14": "FRANCHISE_TELLER",
+              "15": "PERSONAL_BANKING",
+              "16": "PUBLIC_UTILITY",
+              "17": "VENDING",
+              "18": "SELF_SERVICE",
+              "19": "AUTHORIZATION",
+              "20": "PAYMENT",
+              "21": "VRU",
+              "22": "SMARTPHONE_POS_DEVICE",
+              "23": "INTERACTIVE_TELEVISION",
+              "24": "PDA",
+              "25": "SCREEN_PHONE",
+              "26": "ELECTRONIC_COMMERCE",
+              "27": "MICR_TERMINALS_POS"
+            }
+          },
+          "cardDataInputCapability": {
+            "position": 11,
+            "mapping": {
+              "0": "CARD_DATA_INPUT_CAPABILITY_UNKNOWN",
+              "1": "MANUAL_NO_TERMINAL",
+              "2": "MAGNETIC_STRIPE",
+              "3": "BARCODE_QRCODE",
+              "4": "OCR",
+              "5": "ICC_CHIP",
+              "6": "KEY_ENTRY",
+              "7": "FILE",
+              "8": "CONTACTLESS_MAG_STRIPE_KEY_ENTRY",
+              "9": "CONTACTLESS_CHIP_MAG_STRIPE_ICC_KEY_ENTRY",
+              "10": "MAG_STRIPE_KEY_ENTRY",
+              "11": "MAG_STRIPE_KEY_ENTRY_EMV_ICC",
+              "12": "MAG_STRIPE_EMV_ICC",
+              "13": "SECURE_CARD_LESS_ENTRY"
+            }
+          }
+        }
+      }
+    }
   },
   "59": {
     "name": "National Point-of-Service Geographical Data",
