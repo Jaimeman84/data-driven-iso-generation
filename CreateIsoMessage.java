@@ -509,13 +509,13 @@ public class CreateIsoMessage  {
             System.out.println("\nProcessing rows 4 to " + (totalRows + 1));
 
             // Create headers for ISO Message and Validation Results
-            Cell isoHeaderCell = headerRow.createCell(82); // Column CE
+            Cell isoHeaderCell = headerRow.createCell(88); // Column CE
             isoHeaderCell.setCellValue("Generated ISO Message");
-            Cell validationHeaderCell = headerRow.createCell(83); // Column CF
+            Cell validationHeaderCell = headerRow.createCell(89); // Column CF
             validationHeaderCell.setCellValue("Validation Results");
 
             // Process each row starting from row 4
-            for (int rowIndex = 3; rowIndex <= totalRows; rowIndex++) {
+            for (int rowIndex = 5; rowIndex <= totalRows; rowIndex++) {
                 Row dataRow = sheet.getRow(rowIndex);
                 if (dataRow == null) {
                     System.out.println("\nSkipping empty row " + (rowIndex + 1));
@@ -589,7 +589,7 @@ public class CreateIsoMessage  {
                     System.out.println(isoMessage);
 
                     // Write the ISO message to the spreadsheet
-                    Cell messageCell = dataRow.createCell(82); // Column CE
+                    Cell messageCell = dataRow.createCell(88); // Column CK
                     messageCell.setCellValue(isoMessage);
 
                     try {
@@ -598,7 +598,7 @@ public class CreateIsoMessage  {
                         validationResult.printResults();
 
                         // Write validation results to the spreadsheet
-                        Cell validationCell = dataRow.createCell(83); // Column CF
+                        Cell validationCell = dataRow.createCell(89); // Column CF
                         long passCount = validationResult.getResults().values().stream()
                             .filter(r -> r.getStatus() == FieldStatus.PASSED).count();
                         long failCount = validationResult.getResults().values().stream()

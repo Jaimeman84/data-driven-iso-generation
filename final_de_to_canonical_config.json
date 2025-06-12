@@ -312,6 +312,20 @@
     "active": false,
     "SampleData": "001"
   },
+  "20": {
+    "name": "Primary Account Number (PAN) Extended Country Code",
+    "canonical": [],
+    "format": "fixed",
+    "length": 3,
+    "type": "numeric",
+    "active": false,
+    "SampleData": "USA",
+    "notes": "Required if DE 34 (PAN Extended) is sent. Not applicable for MVP.",
+    "validation": {
+      "skip": true,
+      "reason": "PAN Extended Country Code is not canonicalized because it is not required."
+    }
+  },
   "21": {
     "name": "Forwarding Institution Country Code",
     "canonical": [
@@ -362,6 +376,20 @@
     "notes": "No specific validation required. Optional field.",
     "active": false,
     "SampleData": "022"
+  },
+  "26": {
+    "name": "Point-of-Service PIN Capture Code",
+    "canonical": [],
+    "format": "fixed",
+    "length": 2,
+    "type": "numeric",
+    "active": false,
+    "SampleData": "11",
+    "notes": "Indicates the PIN block. Ignored in production unless certification requires it.",
+    "validation": {
+      "skip": true,
+      "reason": "Point-of-Service PIN Code is not canonicalized because it is not required."
+    }
   },
   "27": {
     "name": "Authorization Identification Response Length",
@@ -497,6 +525,46 @@
     "active": false,
     "SampleData": "09111111111"
   },
+  "34": {
+    "name": "Primay Account Number (PAN) Extended",
+    "canonical": [],
+    "format": "llvar",
+    "max_length": 28,
+    "type": "numeric",
+    "active": false,
+    "SampleData": "2611111111111111111111111111",
+    "notes": "Optional field. No specific validation required.",
+    "validation": {
+      "skip": true,
+      "reason": "PAN Extended is not canonicalized because it is not required."
+    }
+  },
+  "35": {
+    "name": "Track 2 Data",
+    "canonical": [],
+    "format": "llvar",
+    "max_length": 37,
+    "type": "alphanumeric",
+    "active": false,
+    "SampleData": ";5314451120000000=2812221711760?",
+    "validation": {
+      "skip": true,
+      "reason": "Track 2 data is not canonicalized for security reasons"
+    }
+  },
+  "36": {
+    "name": "Track 3 Data",
+    "canonical": [],
+    "format": "llvar",
+    "max_length": 104,
+    "type": "alphanumeric",
+    "active": false,
+    "SampleData": ";5314451120000000=2812221711760?",
+    "validation": {
+      "skip": true,
+      "reason": "Track 3 data is not canonicalized because is not populated as part of the embossing"
+    }
+  },
   "37": {
     "name": "Retrieval Reference Number",
     "canonical": [
@@ -524,14 +592,18 @@
   "39": {
     "name": "Response Code",
     "canonical": [
-      "In Response (not canonicalize). Transaction.authorization.responseCode"
+      "Transaction.authorization.responseCode"
     ],
     "format": "fixed",
     "type": "alphanumeric",
     "length": 3,
     "notes": "Indicates the result of the transaction. Example: '00' - Approved, '05' - Declined.",
     "active": false,
-    "SampleData": "RC1"
+    "SampleData": "RC1",
+    "validation": {
+      "skip": true,
+      "reason": "Response Code is in Response (not canonicalize for request)."
+    }
   },
   "40": {
     "name": "Service Restriction Code",
@@ -598,6 +670,19 @@
     "active": false,
     "notes": ""
   },
+  "45": {
+    "name": "Track 1 Data",
+    "canonical": [],
+    "format": "llvar",
+    "max_length": 76,
+    "type": "alphanumeric",
+    "active": false,
+    "SampleData": "12T1D525MAX076",
+    "validation": {
+      "skip": true,
+      "reason": "Track 1 data is not canonicalized for security reasons"
+    }
+  },
   "46": {
     "name": "Additional Fees",
     "canonical": [
@@ -616,6 +701,20 @@
     "max_length": 88,
     "active": false,
     "SampleData": "013ABC1235MAX088"
+  },
+  "47": {
+    "name": "Additional Data National",
+    "canonical": [],
+    "format": "lllvar",
+    "max_length": 100,
+    "type": "alphanumeric",
+    "active": false,
+    "SampleData": "020ABC12345678910MAX100",
+    "notes": "Mainly used for 3DS authentication values. Ignore for MVP unless 3DS is supported.",
+    "validation": {
+      "skip": true,
+      "reason": "Additional Data National is not canonicalized because 3DS is not required."
+    }
   },
   "48": {
     "name": "Institution/Merchant Name/Consumer Name",
@@ -676,6 +775,20 @@
     "active": false,
     "SampleData": "002"
   },
+  "52": {
+    "name": "Personal Identification Number (PIN) Data",
+    "canonical": [],
+    "format": "fixed",
+    "length": 64,
+    "type": "binary",
+    "active": false,
+    "SampleData": "0011111100000111000000011011100011100001011010000001111111011100",
+    "notes": "Ignored in production unless certification requires it. Send to C-Box for validation during certification.",
+    "validation": {
+      "skip": true,
+      "reason": "PIN Data is not canonicalized because 3DS is not supported."
+    }
+  },
   "54": {
     "name": "Additional Amounts",
     "canonical": [
@@ -692,6 +805,20 @@
     "max_length": 240,
     "active": false,
     "SampleData": "020ABC12345678910MAX240"
+  },
+  "55": {
+    "name": "Integrated Chip Card (ICC) Data",
+    "canonical": [],
+    "format": "lllvar",
+    "max_length": 255,
+    "type": "binary",
+    "active": false,
+    "SampleData": "110101110001101111100101111100011111010110100101111100110111000001000111101001101101100111101000110111110111100110100110000101101101000011000110010011111100011000001100010001010010001000101010101001111010100000011101101001110000100011000110101100100111101",
+    "notes": "Decline with error code 12 if received, as EMV transactions are not supported in MVP.",
+    "validation": {
+      "skip": true,
+      "reason": "ICC Data is not canonicalized because EMV transactions are not supported."
+    }
   },
   "56": {
     "name": "Replacement Additional Fees",
@@ -968,6 +1095,20 @@
     "active": false,
     "SampleData": "020ABC12345678910MAX050"
   },
+  "67": {
+    "name": "Extended Payment Code",
+    "canonical": [],
+    "format": "fixed",
+    "length": 2,
+    "type": "numeric",
+    "active": false,
+    "SampleData": "01",
+    "notes": "Sent if the issuer wants to know which processor acquired the transaction.",
+    "validation": {
+      "skip": true,
+      "reason": "Extended Payment Code is not canonicalized because it is not required."
+    }
+  },
   "70": {
     "name": "Network Management Information code",
     "canonical": [
@@ -978,6 +1119,20 @@
     "length": null,
     "active": false,
     "notes": ""
+  },
+  "73": {
+    "name": "Date, Action",
+    "canonical": [],
+    "format": "fixed",
+    "length": 6,
+    "type": "numeric",
+    "active": false,
+    "SampleData": "120625",
+    "notes": "Not implementes in MC documentation",
+    "validation": {
+      "skip": true,
+      "reason": "Date, Action is not canonicalized because it is not required."
+    }
   },
   "90": {
     "name": "Original Data Elements",
@@ -1055,6 +1210,15 @@
     "notes": "Processor-assigned password. Required when DE 70 (Network Management Information Code) contains specific values.",
     "active": false,
     "SampleData": "0011111100000111000000011011100011100001011010000001111111011100"
+  },
+  "98": {
+    "name": "Payee",
+    "format": "fixed",
+    "length": 25,
+    "type": "alphanumeric",
+    "active": false,
+    "SampleData": "ABCJOHNSMIT09213020320211",
+    "notes": "Sent if available and if the transaction is a payment transaction."
   },
   "100": {
     "name": "Receiving Institution Identification Code",
@@ -1191,103 +1355,5 @@
     "notes": "Required when MACing messages, at least one DE between 65-127 is present, and no DEs between 129-191 are present.",
     "active": false,
     "SampleData": "1000001000111010101001100101011001000111100000000010110110100011"
-  },
-  "20": {
-    "name": "Primary Account Number (PAN) Extended Country Code",
-    "format": "fixed",
-    "length": 3,
-    "type": "numeric",
-    "active": false,
-    "SampleData": "USA",
-    "notes": "Required if DE 34 (PAN Extended) is sent. Not applicable for MVP."
-  },
-  "26": {
-    "name": "Point-of-Service PIN Capture Code",
-    "format": "fixed",
-    "length": 2,
-    "type": "numeric",
-    "active": false,
-    "SampleData": "11",
-    "notes": "Indicates the PIN block. Ignored in production unless certification requires it."
-  },
-  "34": {
-    "name": "Primay Account Number (PAN) Extended",
-    "format": "llvar",
-    "max_length": 28,
-    "type": "numeric",
-    "active": false,
-    "SampleData": "2611111111111111111111111111",
-    "notes": "Optional field. No specific validation required."
-  },
-  "35": {
-    "name": "Track 2 Data",
-    "canonical": [],
-    "format": "llvar",
-    "max_length": 37,
-    "type": "alphanumeric",
-    "active": false,
-    "SampleData": ";5314451120000000=2812221711760?",
-    "validation": {
-      "skip": true,
-      "reason": "Track data is not canonicalized for security reasons"
-    }
-  },
-  "45": {
-    "name": "Track 1 Data",
-    "canonical": [],
-    "format": "llvar",
-    "max_length": 76,
-    "type": "alphanumeric",
-    "active": false,
-    "SampleData": "12T1D525MAX076",
-    "validation": {
-      "skip": true,
-      "reason": "Track data is not canonicalized for security reasons"
-    }
-  },
-  "47": {
-    "name": "Additional Data National",
-    "format": "lllvar",
-    "max_length": 100,
-    "type": "alphanumeric",
-    "active": false,
-    "SampleData": "020ABC12345678910MAX100",
-    "notes": "Mainly used for 3DS authentication values. Ignore for MVP unless 3DS is supported."
-  },
-  "52": {
-    "name": "Personal Identification Number (PIN) Data",
-    "format": "fixed",
-    "length": 64,
-    "type": "binary",
-    "active": false,
-    "SampleData": "0011111100000111000000011011100011100001011010000001111111011100",
-    "notes": "Ignored in production unless certification requires it. Send to C-Box for validation during certification."
-  },
-  "55": {
-    "name": "Integrated Chip Card (ICC) Data",
-    "format": "lllvar",
-    "max_length": 255,
-    "type": "binary",
-    "active": false,
-    "SampleData": "110101110001101111100101111100011111010110100101111100110111000001000111101001101101100111101000110111110111100110100110000101101101000011000110010011111100011000001100010001010010001000101010101001111010100000011101101001110000100011000110101100100111101",
-    "notes": "Decline with error code 12 if received, as EMV transactions are not supported in MVP."
-  },
-  "67": {
-    "name": "Extended Payment Code",
-    "format": "fixed",
-    "length": 2,
-    "type": "numeric",
-    "active": false,
-    "SampleData": "01",
-    "notes": "Sent if the issuer wants to know which processor acquired the transaction."
-  },
-  "98": {
-    "name": "Payee",
-    "format": "fixed",
-    "length": 25,
-    "type": "alphanumeric",
-    "active": false,
-    "SampleData": "ABCJOHNSMIT09213020320211",
-    "notes": "Sent if available and if the transaction is a payment transaction."
   }
 }
