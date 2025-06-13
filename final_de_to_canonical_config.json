@@ -866,11 +866,10 @@
   "54": {
     "name": "Additional Amounts",
     "canonical": [
-      "transaction.additionalAmounts.accountType",
-      "transaction.additionalAmounts.amountType",
-      "transaction.additionalAmounts.amount.currencyCode",
-      "transaction.additionalAmounts.amount.debitCreditIndicator",
-      "transaction.additionalAmounts.amount.amount"
+      "transaction.additionalAmounts[0].accountType",
+      "transaction.additionalAmounts[0].amount.currencyCode",
+      "transaction.additionalAmounts[0].amount.debitCreditIndicatorType",
+      "transaction.additionalAmounts[0].amount.amount"
     ],
     "format": "lllvar",
     "type": "alphanumeric",
@@ -878,7 +877,44 @@
     "notes": "Used for healthcare transactions. Pass to auth engine if received.",
     "max_length": 240,
     "active": false,
-    "SampleData": "020ABC12345678910MAX240"
+    "SampleData": "020ABC12345678910MAX240",
+    "validation": {
+      "type": "additional_amounts",
+      "rules": {
+        "positions": {
+          "accountType": {
+            "start": 1,
+            "end": 2,
+            "mapping": {
+              "00": "DEFAULT"
+            }
+          },
+          "currencyCode": {
+            "start": 5,
+            "end": 7
+          },
+          "amount": {
+            "start": 8,
+            "end": 20,
+            "components": {
+              "debitCreditIndicator": {
+                "position": 8,
+                "mapping": {
+                  "C": "CREDIT_AMOUNT",
+                  "D": "DEBIT_AMOUNT"
+                }
+              },
+              "amount": {
+                "start": 9,
+                "end": 20,
+                "type": "numeric",
+                "removeLeadingZeros": true
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "55": {
     "name": "Integrated Chip Card (ICC) Data",
