@@ -467,6 +467,65 @@ public class CreateIsoMessage  {
                     messageCell.setCellValue(isoMessage);
 
                     try {
+                        // Send message via WebSocket and get response
+                        IsoWebSocketClient wsClient = new IsoWebSocketClient();
+                        String wsResponse = wsClient.sendIsoMessage("ws://your-websocket-url:port/service", isoMessage);
+                        System.out.println("\nWebSocket Response:");
+                        System.out.println(wsResponse);
+
+                        // Send the WebSocket response to the parser
+                        String parsedResponse = sendIsoMessageToParser(wsResponse);
+                        JsonNode responseJson = objectMapper.readTree(parsedResponse);
+
+                        // Create a cell for the response code (Column CN)
+                        Cell responseCell = dataRow.createCell(92); // Column CN
+
+                        // Extract MTI and DE 39 from response
+                        String responseMti = null;
+                        String responseCode = null;
+                        String responseDesc = "";
+
+                        // Find MTI and DE 39 in the parsed response
+                        for (JsonNode element : responseJson) {
+                            if (element.has("dataElementId")) {
+                                String deId = element.get("dataElementId").asText();
+                                if ("MTI".equals(deId)) {
+                                    responseMti = element.get("value").asText();
+                                } else if ("39".equals(deId)) {
+                                    responseCode = element.get("value").asText();
+                                    // You can add a mapping here for response code descriptions
+                                    responseDesc = getResponseCodeDescription(responseCode);
+                                }
+                            }
+                        }
+
+                        // Validate MTI (0100 -> 0110, etc.)
+                        String expectedResponseMti = getExpectedResponseMti(isoFields.get(0));
+                        boolean mtiValid = expectedResponseMti.equals(responseMti);
+
+                        // Format the response information
+                        StringBuilder responseInfo = new StringBuilder();
+                        responseInfo.append("MTI: ").append(responseMti)
+                                  .append(mtiValid ? " (✓)" : " (✗)");
+                        
+                        if (responseCode != null) {
+                            responseInfo.append(", DE 39: ").append(responseCode);
+                            if (!responseDesc.isEmpty()) {
+                                responseInfo.append(" (").append(responseDesc).append(")");
+                            }
+                        } else {
+                            responseInfo.append(", DE 39: Not found in response");
+                        }
+
+                        responseCell.setCellValue(responseInfo.toString());
+
+                    } catch (Exception e) {
+                        System.out.println("\nWebSocket/Parser Error: " + e.getMessage());
+                        Cell responseCell = dataRow.createCell(92); // Column CN
+                        responseCell.setCellValue("Error: " + e.getMessage());
+                    }
+
+                    try {
                         // Validate against canonical form
                         ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, dataRow);
                         validationResult.printResults();
@@ -2019,4 +2078,39 @@ public class CreateIsoMessage  {
         }
     }
 
+    /**
+     * Gets the expected response MTI based on the request MTI
+     */
+    private static String getExpectedResponseMti(String requestMti) {
+        // Common MTI response mappings
+        switch (requestMti) {
+            case "0100": return "0110"; // Authorization Request -> Response
+            case "0200": return "0210"; // Financial Request -> Response
+            case "0400": return "0410"; // Reversal Request -> Response
+            case "0420": return "0430"; // Reversal Advice -> Acknowledgment
+            case "0800": return "0810"; // Network Management Request -> Response
+            default: return requestMti.substring(0, 2) + "10"; // Generic response
+        }
+    }
+
+    /**
+     * Gets the description for a response code
+     * This can be expanded with more response codes and descriptions
+     */
+    private static String getResponseCodeDescription(String responseCode) {
+        // This is a placeholder - you can add more response codes and descriptions
+        Map<String, String> descriptions = new HashMap<>();
+        descriptions.put("00", "Approved");
+        descriptions.put("01", "Refer to card issuer");
+        descriptions.put("05", "Do not honor");
+        descriptions.put("13", "Invalid amount");
+        descriptions.put("14", "Invalid card number");
+        descriptions.put("51", "Insufficient funds");
+        descriptions.put("54", "Expired card");
+        descriptions.put("55", "Invalid PIN");
+        descriptions.put("75", "Allowable number of PIN tries exceeded");
+        descriptions.put("91", "Issuer or switch is inoperative");
+        
+        return descriptions.getOrDefault(responseCode, "Unknown response code");
+    }
 }
