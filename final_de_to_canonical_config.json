@@ -686,13 +686,13 @@
   "46": {
     "name": "Additional Fees",
     "canonical": [
-      "transaction.fees.additionalFees.feeType",
-      "transaction.fees.additionalFees.settleMemoIndicator",
-      "transaction.fees.additionalFees.decimalizationIndicator",
-      "transaction.fees.additionalFees.fee.amount.amount",
-      "transaction.fees.additionalFees.fee.amount.debitCreditIndicatorType",
-      "transaction.fees.additionalFees.settlement.settlementAmount.amount",
-      "transaction.fees.additionalFees.settlement.settlementAmount.debitCreditIndicatorType"
+      "transaction.fees.additionalFees[0].feeType",
+      "transaction.fees.additionalFees[0].settleMemoIndicator",
+      "transaction.fees.additionalFees[0].decimalizationIndicator",
+      "transaction.fees.additionalFees[0].fee.amount.amount",
+      "transaction.fees.additionalFees[0].fee.amount.debitCreditIndicatorType",
+      "transaction.fees.additionalFees[0].settlement.settlementAmount.amount",
+      "transaction.fees.additionalFees[0].settlement.settlementAmount.debitCreditIndicatorType"
     ],
     "format": "lllvar",
     "type": "alphanumeric",
@@ -704,6 +704,7 @@
     "validation": {
       "type": "additional_fees",
       "rules": {
+        "isArray": true,
         "positions": {
           "feeType": {
             "start": 1,

@@ -378,7 +378,7 @@ public class CreateIsoMessage  {
                 throw new IOException("Header row (Row 1) not found in spreadsheet");
             }
 
-            // Process from Row 4 (index 3) onwards
+            // Process from Row 6 (index 5) onwards
             int totalRows = sheet.getLastRowNum();
             System.out.println("\nProcessing rows 6 to " + (totalRows + 1));
 
@@ -1142,9 +1142,29 @@ public class CreateIsoMessage  {
         JsonNode current = rootNode;
 
         for (String part : parts) {
-            current = current.path(part);
-            if (current.isMissingNode()) {
-                return null;
+            // Handle array access notation [n]
+            if (part.contains("[") && part.contains("]")) {
+                String fieldName = part.substring(0, part.indexOf("["));
+                String indexStr = part.substring(part.indexOf("[") + 1, part.indexOf("]"));
+                int index = Integer.parseInt(indexStr);
+                
+                // Get the array field first
+                current = current.path(fieldName);
+                if (current.isMissingNode()) {
+                    return null;
+                }
+                
+                // Then access the array element
+                if (current.isArray() && current.size() > index) {
+                    current = current.get(index);
+                } else {
+                    return null;
+                }
+            } else {
+                current = current.path(part);
+                if (current.isMissingNode()) {
+                    return null;
+                }
             }
         }
 
