@@ -530,54 +530,33 @@ public class CreateIsoMessage  {
                 Arrays.fill(primaryBitmap, false);
                 Arrays.fill(secondaryBitmap, false);
 
-                int processedFields = 0;
-                // Start from Column B (index 1) and go to Column CJ (index 87)
-                for (int colNum = 1; colNum <= 87; colNum++) {
-                    // Get the Data Element Key from Row 1
-                    Cell headerCell = headerRow.getCell(colNum);
-                    String dataElementKey = getCellValueAsString(headerCell).trim();
-                    if (dataElementKey.isEmpty()) {
-                        continue;
-                    }
-
-                    // Get the data from current row
-                    Cell dataCell = dataRow.getCell(colNum);
-                    String sampleData = getCellValueAsString(dataCell).trim();
-                    if (sampleData.isEmpty()) {
-                        continue;
-                    }
-
-                    System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
-                    System.out.println("  Data Element Key: " + dataElementKey);
-                    System.out.println("  Sample Data: " + sampleData);
-
-                    // Determine the data type from the configuration
-                    String dataType = "String"; // Default type
-                    JsonNode config = fieldConfig.get(dataElementKey);
-                    if (config != null && config.has("type")) {
-                        dataType = config.get("type").asText();
-                    }
-                    System.out.println("  Data Type: " + dataType);
-
-                    try {
-                        // Get the field name from configuration
-                        String fieldName = "";
-                        if (config != null && config.has("name")) {
-                            fieldName = config.get("name").asText();
-                        } else {
-                            System.out.println("  Warning: No field name found in configuration for key " + dataElementKey);
-                            fieldName = "Field_" + dataElementKey; // Fallback
+                // Extract values from Excel row
+                Map<String, String> deValues = extractDEValuesFromExcel(dataRow);
+                
+                // Check for special validation cases first
+                System.out.println("\nChecking for special validation cases...");
+                for (Map.Entry<String, String> entry : deValues.entrySet()) {
+                    String de = entry.getKey();
+                    String value = entry.getValue();
+                    
+                    if (hasSpecialValidation(de)) {
+                        System.out.println("DE " + de + " requires special validation");
+                        JsonNode config = fieldConfig.get(de);
+                        if (config != null && config.has("validation")) {
+                            JsonNode validation = config.get("validation");
+                            if (validation.has("type")) {
+                                String validationType = validation.get("type").asText();
+                                System.out.println("Validation type for DE " + de + ": " + validationType);
+                                
+                                // Store the field for later processing
+                                addField(de, value);
+                                processedFields++;
+                            }
                         }
-
-                        // Apply the field update using the same logic as i_create_iso_message
-                        applyBddUpdate(fieldName, sampleData, dataType);
-                        processedFields++;
-                        System.out.println("  Status: Processed successfully");
-                    } catch (Exception e) {
-                        System.out.println("  Status: Failed to process - " + e.getMessage());
                     }
                 }
 
+                // Continue with the rest of the processing only if we have fields to process
                 if (processedFields > 0) {
                     System.out.println("\n=== Row " + (rowIndex + 1) + " Processing Summary ===");
                     System.out.println("Total fields processed: " + processedFields);
