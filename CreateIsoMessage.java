@@ -1756,10 +1756,18 @@ public class CreateIsoMessage  {
             boolean allValid = true;
             StringBuilder validationDetails = new StringBuilder();
 
+            // Get the first additional fee from the array
+            JsonNode additionalFees = actualJson.path("transaction").path("fees").path("additionalFees");
+            if (!additionalFees.isArray() || additionalFees.size() == 0) {
+                result.addFailedField(de, expected, "No additional fees found in canonical response");
+                return false;
+            }
+            JsonNode fee = additionalFees.get(0);
+
             // Validate Fee Type (positions 1-2)
             String feeType = expected.substring(0, 2);
             String expectedFeeType = positions.get("feeType").get("mapping").get(feeType).asText();
-            String actualFeeType = getJsonValue(actualJson, "transaction.fees.additionalFees.feeType");
+            String actualFeeType = fee.path("feeType").asText();
             boolean feeTypeValid = expectedFeeType.equals(actualFeeType);
             validationDetails.append(String.format("Fee Type: %s->%s (%s), ", 
                 feeType, expectedFeeType, feeTypeValid ? "✓" : "✗"));
@@ -1768,7 +1776,7 @@ public class CreateIsoMessage  {
             // Validate Settlement Memo Indicator (position 3)
             String settleMemo = expected.substring(2, 3);
             String expectedSettleMemo = positions.get("settleMemoIndicator").get("mapping").get(settleMemo).asText();
-            String actualSettleMemo = getJsonValue(actualJson, "transaction.fees.additionalFees.settleMemoIndicator");
+            String actualSettleMemo = fee.path("settleMemoIndicator").asText();
             boolean settleMemoValid = expectedSettleMemo.equals(actualSettleMemo);
             validationDetails.append(String.format("Settle Memo: %s->%s (%s), ", 
                 settleMemo, expectedSettleMemo, settleMemoValid ? "✓" : "✗"));
@@ -1777,7 +1785,7 @@ public class CreateIsoMessage  {
             // Validate Decimalization Indicator (position 4)
             String decimalization = expected.substring(3, 4);
             String expectedDecimalization = positions.get("decimalizationIndicator").get("mapping").get(decimalization).asText();
-            String actualDecimalization = getJsonValue(actualJson, "transaction.fees.additionalFees.decimalizationIndicator");
+            String actualDecimalization = fee.path("decimalizationIndicator").asText();
             boolean decimalizationValid = expectedDecimalization.equals(actualDecimalization);
             validationDetails.append(String.format("Decimalization: %s (%s), ", 
                 decimalization, decimalizationValid ? "✓" : "✗"));
@@ -1790,7 +1798,7 @@ public class CreateIsoMessage  {
             // Validate Debit/Credit Indicator (position 5)
             String feeIndicator = feeAmountValue.substring(0, 1);
             String expectedFeeIndicator = feeAmount.get("components").get("debitCreditIndicator").get("mapping").get(feeIndicator).asText();
-            String actualFeeIndicator = getJsonValue(actualJson, "transaction.fees.additionalFees.fee.amount.debitCreditIndicatorType");
+            String actualFeeIndicator = fee.path("fee").path("amount").path("debitCreditIndicatorType").asText();
             boolean feeIndicatorValid = expectedFeeIndicator.equals(actualFeeIndicator);
             validationDetails.append(String.format("Fee Indicator: %s->%s (%s), ", 
                 feeIndicator, expectedFeeIndicator, feeIndicatorValid ? "✓" : "✗"));
@@ -1799,7 +1807,7 @@ public class CreateIsoMessage  {
             // Validate Fee Amount (positions 6-13)
             String feeAmountStr = feeAmountValue.substring(1);
             String normalizedFeeAmount = String.valueOf(Long.parseLong(feeAmountStr)); // Remove leading zeros
-            String actualFeeAmount = getJsonValue(actualJson, "transaction.fees.additionalFees.fee.amount.amount");
+            String actualFeeAmount = fee.path("fee").path("amount").path("amount").asText();
             boolean feeAmountValid = normalizedFeeAmount.equals(actualFeeAmount);
             validationDetails.append(String.format("Fee Amount: %s->%s (%s), ", 
                 feeAmountStr, normalizedFeeAmount, feeAmountValid ? "✓" : "✗"));
@@ -1812,7 +1820,7 @@ public class CreateIsoMessage  {
             // Validate Settlement Debit/Credit Indicator (position 14)
             String settlementIndicator = settlementValue.substring(0, 1);
             String expectedSettlementIndicator = settlementAmount.get("components").get("debitCreditIndicator").get("mapping").get(settlementIndicator).asText();
-            String actualSettlementIndicator = getJsonValue(actualJson, "transaction.fees.additionalFees.settlement.settlementAmount.debitCreditIndicatorType");
+            String actualSettlementIndicator = fee.path("settlement").path("settlementAmount").path("debitCreditIndicatorType").asText();
             boolean settlementIndicatorValid = expectedSettlementIndicator.equals(actualSettlementIndicator);
             validationDetails.append(String.format("Settlement Indicator: %s->%s (%s), ", 
                 settlementIndicator, expectedSettlementIndicator, settlementIndicatorValid ? "✓" : "✗"));
@@ -1821,7 +1829,7 @@ public class CreateIsoMessage  {
             // Validate Settlement Amount (positions 15-22)
             String settlementAmountStr = settlementValue.substring(1);
             String normalizedSettlementAmount = String.valueOf(Long.parseLong(settlementAmountStr)); // Remove leading zeros
-            String actualSettlementAmount = getJsonValue(actualJson, "transaction.fees.additionalFees.settlement.settlementAmount.amount");
+            String actualSettlementAmount = fee.path("settlement").path("settlementAmount").path("amount").asText();
             boolean settlementAmountValid = normalizedSettlementAmount.equals(actualSettlementAmount);
             validationDetails.append(String.format("Settlement Amount: %s->%s (%s)", 
                 settlementAmountStr, normalizedSettlementAmount, settlementAmountValid ? "✓" : "✗"));

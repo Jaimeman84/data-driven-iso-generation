@@ -709,22 +709,20 @@
             "start": 1,
             "end": 2,
             "mapping": {
-              "00": "TRANSACTION_FEE_TYPE_DEFAULT",
-              "01": "TRANSACTION_FEE",
-              "02": "MASTERCARD_CURRENCY_CONVERSION_ASSESSMENT",
-              "03": "OPTIONAL_ISSUER_FEE",
-              "04": "FOREIGN_EXCHANGE_FEE",
-              "05": "OVERDRAFT_FEE",
-              "06": "ADDITIONAL_TRANSACTION_FEE_1",
-              "07": "ADDITIONAL_TRANSACTION_FEE_2"
+              "00": "TRANSACTION_FEE",
+              "15": "MASTERCARD_CURRENCY_CONVERSION_ASSESSMENT",
+              "71": "OPTIONAL_ISSUER_FEE",
+              "72": "FOREIGN_EXCHANGE_FEE",
+              "73": "OVERDRAFT_FEE",
+              "74": "ADDITIONAL_TRANSACTION_FEE_1",
+              "75": "ADDITIONAL_TRANSACTION_FEE_2"
             }
           },
           "settleMemoIndicator": {
             "position": 3,
             "mapping": {
-              "0": "SETTLEMENT_MEMO_INDICATOR_DEFAULT",
-              "1": "TRANSACTION_FEE_EXCLUDED",
-              "2": "SURCHARGE_FEE_INCLUDED"
+              "0": "TRANSACTION_FEE_EXCLUDED",
+              "1": "SURCHARGE_FEE_INCLUDED"
             }
           },
           "decimalizationIndicator": {
