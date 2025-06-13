@@ -490,6 +490,9 @@ public class CreateIsoMessage  {
                         ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, dataRow);
                         validationResult.printResults();
 
+                        // Export validation results to Excel
+                        exportValidationResultsToExcel(workbook, validationResult, rowIndex);
+
                         // Write validation results to the spreadsheet
                         Cell validationCell = dataRow.createCell(90); // Column CM
                         long passCount = validationResult.getResults().values().stream()
@@ -2106,5 +2109,104 @@ public class CreateIsoMessage  {
         descriptions.put("91", "Issuer or switch is inoperative");
         
         return descriptions.getOrDefault(responseCode, "Unknown response code");
+    }
+
+    /**
+     * Exports validation results to a new sheet in the Excel workbook
+     * @param workbook The Excel workbook to add the sheet to
+     * @param results The validation results to export
+     * @param rowIndex The current row being processed
+     */
+    private static void exportValidationResultsToExcel(Workbook workbook, ValidationResult results, int rowIndex) {
+        // Get or create the Validation Results sheet
+        Sheet validationSheet = workbook.getSheet("Validation Results");
+        if (validationSheet == null) {
+            validationSheet = workbook.createSheet("Validation Results");
+            
+            // Create header row
+            Row headerRow = validationSheet.createRow(0);
+            String[] headers = {"Row #", "DE", "Status", "ISO Value", "Canonical Value", "Mapping", "Details"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+            }
+
+            // Set column widths
+            validationSheet.setColumnWidth(0, 10 * 256);  // Row #
+            validationSheet.setColumnWidth(1, 8 * 256);   // DE
+            validationSheet.setColumnWidth(2, 10 * 256);  // Status
+            validationSheet.setColumnWidth(3, 40 * 256);  // ISO Value
+            validationSheet.setColumnWidth(4, 40 * 256);  // Canonical Value
+            validationSheet.setColumnWidth(5, 50 * 256);  // Mapping
+            validationSheet.setColumnWidth(6, 60 * 256);  // Details
+        }
+
+        // Create a sorted map with custom comparator for numeric DE sorting
+        Map<String, FieldResult> sortedResults = new TreeMap<>((de1, de2) -> {
+            // Handle MTI specially
+            if (de1.equals("MTI")) return -1;
+            if (de2.equals("MTI")) return 1;
+            
+            // Convert DEs to integers for numeric comparison
+            try {
+                int num1 = Integer.parseInt(de1);
+                int num2 = Integer.parseInt(de2);
+                return Integer.compare(num1, num2);
+            } catch (NumberFormatException e) {
+                return de1.compareTo(de2);
+            }
+        });
+        sortedResults.putAll(results.getResults());
+
+        // Add results for each DE
+        int currentRow = validationSheet.getLastRowNum() + 1;
+        for (Map.Entry<String, FieldResult> entry : sortedResults.entrySet()) {
+            String de = entry.getKey();
+            FieldResult result = entry.getValue();
+            
+            Row row = validationSheet.createRow(currentRow++);
+            
+            // Row number from original sheet
+            row.createCell(0).setCellValue("Row " + (rowIndex + 1));
+            
+            // DE number
+            row.createCell(1).setCellValue(de);
+            
+            // Status
+            Cell statusCell = row.createCell(2);
+            statusCell.setCellValue(result.getStatus().toString());
+            
+            // ISO Value
+            row.createCell(3).setCellValue(result.getExpected());
+            
+            // Canonical Value
+            String canonicalValue = result.getActual();
+            row.createCell(4).setCellValue(canonicalValue);
+            
+            // Mapping
+            JsonNode config = fieldConfig.get(de);
+            List<String> paths = new ArrayList<>();
+            if (config != null && config.has("canonical")) {
+                JsonNode canonical = config.get("canonical");
+                if (canonical.isArray()) {
+                    canonical.forEach(path -> {
+                        if (path != null) {
+                            paths.add(path.asText());
+                        }
+                    });
+                }
+            }
+            String mapping = paths.isEmpty() ? "No mapping" : String.join(", ", paths);
+            row.createCell(5).setCellValue(mapping);
+            
+            // Additional Details
+            StringBuilder details = new StringBuilder();
+            if (result.getStatus() == FieldStatus.FAILED) {
+                details.append("Validation failed: ").append(canonicalValue);
+            } else if (result.getStatus() == FieldStatus.SKIPPED) {
+                details.append("Skipped: ").append(canonicalValue);
+            }
+            row.createCell(6).setCellValue(details.toString());
+        }
     }
 }
