@@ -9,6 +9,8 @@ import org.apache.poi.hssf.usermodel.HSSFFormulaEvaluator;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,9 +27,11 @@ public class CreateIsoMessage  {
     private static boolean[] primaryBitmap = new boolean[64];
     private static boolean[] secondaryBitmap = new boolean[64];
     private static Set<String> manuallyUpdatedFields = new HashSet<>(); // Tracks modified fields
+    private static final String DEFAULT_MTI = "0100"; // Default MTI value
     private static final String PARSER_URL = "enter url here"; // Replace with actual URL
+    private static final String CANONICAL_URL = "enter url here"; // Replace with actual URL
 
-    public void i_create_iso_message(String requestName, DataTable dt) throws IOException {
+     public void i_create_iso_message(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
 
         List<Map<String, String>> rows = dt.asMaps(String.class, String.class);
@@ -87,7 +91,7 @@ public class CreateIsoMessage  {
 
         if (!isoFields.containsKey(0) && !manuallyUpdatedFields.contains("MTI")) {
 
-            isoFields.put(0, "0100");
+            isoFields.put(0, DEFAULT_MTI);
         }
 
         for (String field : fieldConfig.keySet()) {
@@ -174,11 +178,9 @@ public class CreateIsoMessage  {
 
         // Ensure MTI is included, default to "0100" if not manually set
         if (!isoFields.containsKey(0)) {
-
-            message.append("0100");
+            message.append(DEFAULT_MTI);
         } else {
-            System.out.println(isoFields.get(0));
-
+//            System.out.println(isoFields.get(0));
             message.append(isoFields.get(0));
         }
 
@@ -224,10 +226,10 @@ public class CreateIsoMessage  {
         // Ensure MTI is correctly stored and printed
         if (!isoFields.containsKey(0) && !manuallyUpdatedFields.contains("MTI")) {
 
-            outputJson.put("MTI", isoFields.getOrDefault(0, "0100"));
+            outputJson.put("MTI", isoFields.getOrDefault(0, DEFAULT_MTI));
         }
         else{
-            System.out.println(isoFields.get(0));
+//            System.out.println(isoFields.get(0));
             outputJson.put("MTI", isoFields.get(0));
         }
 
@@ -264,147 +266,19 @@ public class CreateIsoMessage  {
         return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(outputJson);
     }
 
-    private static String bitmapToHex(boolean[] bitmap) {
-        StringBuilder binary = new StringBuilder();
-        for (boolean bit : bitmap) {
-            binary.append(bit ? "1" : "0");
-        }
-
-        // Convert binary string to hex
-        StringBuilder hex = new StringBuilder();
-        for (int i = 0; i < 64; i += 4) {
-            hex.append(Integer.toHexString(Integer.parseInt(binary.substring(i, i + 4), 2)).toUpperCase());
-        }
-
-        return hex.toString();
-    }
-
-    private static boolean hasActivePrimaryFields() {
-        // Check if any fields 1-64 are present
-        for (int field : isoFields.keySet()) {
-            if (field > 0 && field <= 64) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Sends an ISO8583 message to the parser service
-     * @param isoMessage The ISO8583 message to send
-     * @return The JSON response from the parser
-     */
-    public static String sendIsoMessageToParser(String isoMessage) throws IOException {
-        URL url = new URL(PARSER_URL);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Content-Type", "text/plain");
-        connection.setDoOutput(true);
-
-        // Send the request
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = isoMessage.getBytes("utf-8");
-            os.write(input, 0, input.length);
-        }
-
-        // Get response code
-        int responseCode = connection.getResponseCode();
-        StringBuilder response = new StringBuilder();
-
-        // Use error stream for 400 responses, input stream for successful responses
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(responseCode == 400 
-                        ? connection.getErrorStream()
-                        : connection.getInputStream(), "utf-8"))) {
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
-            }
-        }
-
-        // For 400 responses, try to parse the error message
-        if (responseCode == 400) {
-            try {
-                JsonNode errorNode = objectMapper.readTree(response.toString());
-                if (errorNode.has("message")) {
-                    return "Error: " + errorNode.get("message").asText();
-                } else if (errorNode.has("error")) {
-                    return "Error: " + errorNode.get("error").asText();
-                }
-            } catch (Exception e) {
-                // If can't parse as JSON, return raw response with Error prefix
-                return "Error: " + response.toString();
-            }
-        }
-
-        return response.toString();
-    }
-
-    /**
-     * Sends an ISO8583 message to the canonical endpoint for validation
-     * @param isoMessage The ISO8583 message to convert to canonical form
-     * @return The canonical JSON response
-     */
-    public static String sendIsoMessageToCanonical(String isoMessage) throws IOException {
-        String CANONICAL_URL = "http://localhost:8080/iso8583/mapToCanonicalObject"; // Replace with actual URL
-        
-        URL url = new URL(CANONICAL_URL);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Content-Type", "text/plain");
-        connection.setDoOutput(true);
-
-        // Send the request
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = isoMessage.getBytes("utf-8");
-            os.write(input, 0, input.length);
-        }
-
-        // Get response code
-        int responseCode = connection.getResponseCode();
-        StringBuilder response = new StringBuilder();
-
-        // Use error stream for 400 responses, input stream for successful responses
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(responseCode == 400 
-                        ? connection.getErrorStream()
-                        : connection.getInputStream(), "utf-8"))) {
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
-            }
-        }
-
-        // For 400 responses, try to parse the error message
-        if (responseCode == 400) {
-            try {
-                JsonNode errorNode = objectMapper.readTree(response.toString());
-                if (errorNode.has("message")) {
-                    return "Error: " + errorNode.get("message").asText();
-                } else if (errorNode.has("error")) {
-                    return "Error: " + errorNode.get("error").asText();
-                }
-            } catch (Exception e) {
-                return "Error: " + response.toString();
-            }
-        }
-
-        return response.toString();
-    }
-
     public static String getFieldNumberFromJsonPath(String jsonPath) {
 
-            return fieldConfig.entrySet().stream()
-                    .filter(entry -> {
-                        JsonNode nameNode = entry.getValue().get("name");
-                        return nameNode != null && jsonPath.equals(nameNode.asText());
-                    })
-                    .findFirst()
-                    .map(entry -> {
-                        System.out.println("Match found - Key: " + entry.getKey() + ", JSONPath: " + jsonPath);
-                        return entry.getKey();
-                    })
-                    .orElse(null);
+        return fieldConfig.entrySet().stream()
+                .filter(entry -> {
+                    JsonNode nameNode = entry.getValue().get("name");
+                    return nameNode != null && jsonPath.equals(nameNode.asText());
+                })
+                .findFirst()
+                .map(entry -> {
+//                    System.out.println("Match found - Key: " + entry.getKey() + ", JSONPath: " + jsonPath);
+                    return entry.getKey();
+                })
+                .orElse(null);
 
 
     }
@@ -438,7 +312,7 @@ public class CreateIsoMessage  {
         if (cell == null) {
             return "";
         }
-        
+
         switch (cell.getCellType()) {
             case NUMERIC:
                 if (DateUtil.isCellDateFormatted(cell)) {
@@ -447,7 +321,7 @@ public class CreateIsoMessage  {
                     // Use DataFormatter to get the formatted string value exactly as it appears in Excel
                     DataFormatter formatter = new DataFormatter();
                     String value = formatter.formatCellValue(cell);
-                    
+
                     // If the value contains 'E' (scientific notation), convert it to plain number
                     if (value.contains("E")) {
                         // Use BigDecimal to handle large numbers without scientific notation
@@ -488,11 +362,11 @@ public class CreateIsoMessage  {
         // Open the Excel workbook
         try (FileInputStream fis = new FileInputStream(filePath);
              Workbook workbook = new XSSFWorkbook(fis)) {
-            
-            Sheet sheet = workbook.getSheetAt(0);
+
+            Sheet sheet = workbook.getSheetAt(4);
             String sheetName = sheet.getSheetName();
             System.out.println("Found worksheet: " + sheetName);
-            
+
             if (!"Auth STIP Integration".equals(sheetName)) {
                 System.out.println("Warning: Expected sheet name 'Auth STIP Integration' but found '" + sheetName + "'");
                 System.out.println("Proceeding with processing anyway...");
@@ -506,15 +380,15 @@ public class CreateIsoMessage  {
 
             // Process from Row 4 (index 3) onwards
             int totalRows = sheet.getLastRowNum();
-            System.out.println("\nProcessing rows 4 to " + (totalRows + 1));
+            System.out.println("\nProcessing rows 6 to " + (totalRows + 1));
 
             // Create headers for ISO Message and Validation Results
-            Cell isoHeaderCell = headerRow.createCell(88); // Column CE
+            Cell isoHeaderCell = headerRow.createCell(89); // Column CL
             isoHeaderCell.setCellValue("Generated ISO Message");
-            Cell validationHeaderCell = headerRow.createCell(89); // Column CF
+            Cell validationHeaderCell = headerRow.createCell(90); // Column CM
             validationHeaderCell.setCellValue("Validation Results");
 
-            // Process each row starting from row 4
+            // Process each row starting from row 6
             for (int rowIndex = 5; rowIndex <= totalRows; rowIndex++) {
                 Row dataRow = sheet.getRow(rowIndex);
                 if (dataRow == null) {
@@ -531,8 +405,8 @@ public class CreateIsoMessage  {
                 Arrays.fill(secondaryBitmap, false);
 
                 int processedFields = 0;
-                // Start from Column B (index 1) and go to Column CJ (index 87)
-                for (int colNum = 1; colNum <= 87; colNum++) {
+                // Start from Column B (index 1) and go to Column CK (index 88)
+                for (int colNum = 1; colNum <= 88; colNum++) {
                     // Get the Data Element Key from Row 1
                     Cell headerCell = headerRow.getCell(colNum);
                     String dataElementKey = getCellValueAsString(headerCell).trim();
@@ -542,14 +416,14 @@ public class CreateIsoMessage  {
 
                     // Get the data from current row
                     Cell dataCell = dataRow.getCell(colNum);
-                    String sampleData = getCellValueAsString(dataCell).trim();
-                    if (sampleData.isEmpty()) {
+                    String cellValue = getCellValueAsString(dataCell).trim();
+                    if (cellValue.isEmpty()) {
                         continue;
                     }
 
-                    System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
-                    System.out.println("  Data Element Key: " + dataElementKey);
-                    System.out.println("  Sample Data: " + sampleData);
+//                    System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
+////                    System.out.println("  Data Element Key: " + dataElementKey);
+////                    System.out.println("  Cell Value: " + cellValue);
 
                     // Determine the data type from the configuration
                     String dataType = "String"; // Default type
@@ -557,7 +431,7 @@ public class CreateIsoMessage  {
                     if (config != null && config.has("type")) {
                         dataType = config.get("type").asText();
                     }
-                    System.out.println("  Data Type: " + dataType);
+//                    System.out.println("  Data Type: " + dataType);
 
                     try {
                         // Get the field name from configuration
@@ -570,9 +444,9 @@ public class CreateIsoMessage  {
                         }
 
                         // Apply the field update using the same logic as i_create_iso_message
-                        applyBddUpdate(fieldName, sampleData, dataType);
+                        applyBddUpdate(fieldName, cellValue, dataType);
                         processedFields++;
-                        System.out.println("  Status: Processed successfully");
+//                        System.out.println("  Status: Processed successfully");
                     } catch (Exception e) {
                         System.out.println("  Status: Failed to process - " + e.getMessage());
                     }
@@ -589,7 +463,7 @@ public class CreateIsoMessage  {
                     System.out.println(isoMessage);
 
                     // Write the ISO message to the spreadsheet
-                    Cell messageCell = dataRow.createCell(88); // Column CK
+                    Cell messageCell = dataRow.createCell(89); // Column CL
                     messageCell.setCellValue(isoMessage);
 
                     try {
@@ -598,37 +472,37 @@ public class CreateIsoMessage  {
                         validationResult.printResults();
 
                         // Write validation results to the spreadsheet
-                        Cell validationCell = dataRow.createCell(89); // Column CF
+                        Cell validationCell = dataRow.createCell(90); // Column CM
                         long passCount = validationResult.getResults().values().stream()
-                            .filter(r -> r.getStatus() == FieldStatus.PASSED).count();
+                                .filter(r -> r.getStatus() == FieldStatus.PASSED).count();
                         long failCount = validationResult.getResults().values().stream()
-                            .filter(r -> r.getStatus() == FieldStatus.FAILED).count();
+                                .filter(r -> r.getStatus() == FieldStatus.FAILED).count();
                         long skipCount = validationResult.getResults().values().stream()
-                            .filter(r -> r.getStatus() == FieldStatus.SKIPPED).count();
+                                .filter(r -> r.getStatus() == FieldStatus.SKIPPED).count();
 
                         // Get failed and skipped DEs
                         String failedDEs = validationResult.getResults().entrySet().stream()
-                            .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
-                            .map(Map.Entry::getKey)
-                            .collect(Collectors.joining(", "));
+                                .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
+                                .map(Map.Entry::getKey)
+                                .collect(Collectors.joining(", "));
                         String skippedDEs = validationResult.getResults().entrySet().stream()
-                            .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
-                            .map(Map.Entry::getKey)
-                            .collect(Collectors.joining(", "));
+                                .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                                .map(Map.Entry::getKey)
+                                .collect(Collectors.joining(", "));
 
                         String validationSummary = String.format(
-                            "Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
-                            validationResult.getResults().size(),
-                            passCount,
-                            failCount,
-                            failCount > 0 ? " (DE " + failedDEs + ")" : "",
-                            skipCount,
-                            skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
+                                "Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
+                                validationResult.getResults().size(),
+                                passCount,
+                                failCount,
+                                failCount > 0 ? " (DE " + failedDEs + ")" : "",
+                                skipCount,
+                                skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
                         );
                         validationCell.setCellValue(validationSummary);
                     } catch (Exception e) {
                         System.out.println("\nValidation failed: " + e.getMessage());
-                        Cell validationCell = dataRow.createCell(83);
+                        Cell validationCell = dataRow.createCell(90); // Column CM
                         validationCell.setCellValue("Validation Error: " + e.getMessage());
                     }
                 } else {
@@ -659,6 +533,102 @@ public class CreateIsoMessage  {
         return columnName.toString();
     }
 
+    public static String sendIsoMessageToParser(String isoMessage) throws IOException {
+        URL url = new URL(PARSER_URL);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/plain");
+        connection.setDoOutput(true);
+
+        // Send the request
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = isoMessage.getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        // Get response code
+        int responseCode = connection.getResponseCode();
+        StringBuilder response = new StringBuilder();
+
+        // Use error stream for 400 responses, input stream for successful responses
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(responseCode == 400
+                        ? connection.getErrorStream()
+                        : connection.getInputStream(), "utf-8"))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        }
+
+        // For 400 responses, try to parse the error message
+        if (responseCode == 400) {
+            try {
+                JsonNode errorNode = objectMapper.readTree(response.toString());
+                if (errorNode.has("message")) {
+                    return "Error: " + errorNode.get("message").asText();
+                } else if (errorNode.has("error")) {
+                    return "Error: " + errorNode.get("error").asText();
+                }
+            } catch (Exception e) {
+                // If can't parse as JSON, return raw response with Error prefix
+                return "Error: " + response.toString();
+            }
+        }
+
+        return response.toString();
+    }
+
+    /**
+     * Sends an ISO8583 message to the canonical endpoint for validation
+     * @param isoMessage The ISO8583 message to convert to canonical form
+     * @return The canonical JSON response
+     */
+    public static String sendIsoMessageToCanonical(String isoMessage) throws IOException {
+        URL url = new URL(CANONICAL_URL);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/plain");
+        connection.setDoOutput(true);
+
+        // Send the request
+        try (OutputStream os = connection.getOutputStream()) {
+            byte[] input = isoMessage.getBytes("utf-8");
+            os.write(input, 0, input.length);
+        }
+
+        // Get response code
+        int responseCode = connection.getResponseCode();
+        StringBuilder response = new StringBuilder();
+
+        // Use error stream for 400 responses, input stream for successful responses
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(responseCode == 400
+                        ? connection.getErrorStream()
+                        : connection.getInputStream(), "utf-8"))) {
+            String responseLine;
+            while ((responseLine = br.readLine()) != null) {
+                response.append(responseLine.trim());
+            }
+        }
+
+        // For 400 responses, try to parse the error message
+        if (responseCode == 400) {
+            try {
+                JsonNode errorNode = objectMapper.readTree(response.toString());
+                if (errorNode.has("message")) {
+                    return "Error: " + errorNode.get("message").asText();
+                } else if (errorNode.has("error")) {
+                    return "Error: " + errorNode.get("error").asText();
+                }
+            } catch (Exception e) {
+                return "Error: " + response.toString();
+            }
+        }
+
+        return response.toString();
+    }
+
     /**
      * Gets the canonical path(s) for a given DE from the config
      * @param de The data element number
@@ -685,21 +655,21 @@ public class CreateIsoMessage  {
      */
     public static ValidationResult validateIsoMessageCanonical(String isoMessage, Row excelRow) throws IOException {
         ValidationResult result = new ValidationResult();
-        
+
         // Get canonical response
         String canonicalResponse = sendIsoMessageToCanonical(isoMessage);
-        
+
         // Parse the canonical response once
         JsonNode canonicalJson = objectMapper.readTree(canonicalResponse);
-        
+
         // Extract values from Excel row
         Map<String, String> deValues = extractDEValuesFromExcel(excelRow);
-        
+
         // Validate each field
         for (Map.Entry<String, String> entry : deValues.entrySet()) {
             String de = entry.getKey();
             String expectedValue = entry.getValue();
-            
+
             // Skip validation for non-canonicalized fields
             if (isNonCanonicalized(de)) {
                 result.addSkippedField(de, expectedValue, getSkipReason(de));
@@ -715,51 +685,40 @@ public class CreateIsoMessage  {
             List<String> canonicalPaths = getCanonicalPaths(de);
             if (!canonicalPaths.isEmpty()) {
                 boolean foundMatch = false;
-                boolean allPathsValid = true;
-                StringBuilder validationDetails = new StringBuilder();
-                
                 for (String jsonPath : canonicalPaths) {
                     // Skip comments or placeholder paths
-                    if (jsonPath.contains("-->") || jsonPath.startsWith("Tag :") || 
-                        jsonPath.contains("Need to discuss") || jsonPath.contains("not canonicalize")) {
+                    if (jsonPath.contains("-->") || jsonPath.startsWith("Tag :") ||
+                            jsonPath.contains("Need to discuss") || jsonPath.contains("not canonicalize")) {
                         continue;
                     }
-                    
+
                     JsonNode actualNode = getValueFromJsonPath(canonicalJson, jsonPath.trim());
                     if (actualNode != null) {
                         String actualValue = actualNode.asText();
-                        
+
                         // For special validation cases, pass the entire canonical response
                         if (hasSpecialValidation(de)) {
-                            boolean pathValid = validateSpecialCase(de, expectedValue, canonicalResponse, result);
-                            allPathsValid &= pathValid;
-                            foundMatch = true;
-                            validationDetails.append(String.format("Path %s: %s, ", jsonPath, pathValid ? "✓" : "✗"));
+                            if (validateSpecialCase(de, expectedValue, canonicalResponse, result)) {
+                                foundMatch = true;
+                                break;
+                            }
                         } else if (expectedValue.equals(actualValue)) {
+                            result.addPassedField(de, expectedValue, actualValue);
                             foundMatch = true;
-                            validationDetails.append(String.format("Path %s: ✓, ", jsonPath));
-                        } else {
-                            allPathsValid = false;
-                            validationDetails.append(String.format("Path %s: ✗, ", jsonPath));
+                            break;
                         }
                     }
                 }
-                
+
                 if (!foundMatch) {
-                    result.addFailedField(de, expectedValue, 
-                        "No matching value found in canonical paths: " + String.join(", ", canonicalPaths));
-                } else if (!allPathsValid) {
-                    result.addFailedField(de, expectedValue, 
-                        "Some paths failed validation: " + validationDetails.toString());
-                } else {
-                    result.addPassedField(de, expectedValue, 
-                        "All paths validated successfully: " + validationDetails.toString());
+                    result.addFailedField(de, expectedValue,
+                            "No matching value found in canonical paths: " + String.join(", ", canonicalPaths));
                 }
             } else {
                 result.addFailedField(de, expectedValue, "No canonical mapping found for DE " + de);
             }
         }
-        
+
         return result;
     }
 
@@ -767,18 +726,11 @@ public class CreateIsoMessage  {
      * Check if a DE requires special validation
      */
     private static boolean hasSpecialValidation(String de) {
-        System.out.println("\nChecking special validation for DE " + de);
         JsonNode config = fieldConfig.get(de);
         if (config != null && config.has("validation")) {
             JsonNode validation = config.get("validation");
-            boolean hasType = validation.has("type");
-            System.out.println("DE " + de + " has validation type: " + hasType);
-            if (hasType) {
-                System.out.println("Validation type: " + validation.get("type").asText());
-            }
-            return hasType;
+            return validation.has("type");
         }
-        System.out.println("DE " + de + " has no validation config");
         return false;
     }
 
@@ -807,7 +759,6 @@ public class CreateIsoMessage  {
         }
         return "Field is not canonicalized";
     }
-
     /**
      * Handles special validation cases for specific DEs based on config
      */
@@ -881,7 +832,7 @@ public class CreateIsoMessage  {
             // Remove leading zeros from expected value
             String normalizedExpected = expected;
             String debitCreditIndicator = "";
-            
+
             // For DEs 28-31, handle debit/credit indicator
             if (Arrays.asList("28", "29", "30", "31").contains(de)) {
                 // Extract first character as indicator
@@ -889,30 +840,30 @@ public class CreateIsoMessage  {
                 // Remove indicator for amount comparison
                 normalizedExpected = expected.substring(1);
             }
-            
+
             // Remove leading zeros
             normalizedExpected = String.valueOf(Long.parseLong(normalizedExpected));
             String normalizedActual = actualValue;
 
             boolean amountMatches = normalizedExpected.equals(normalizedActual);
-            
+
             // For DEs 28-31, also validate debit/credit indicator
             if (amountMatches && !debitCreditIndicator.isEmpty() && rules.has("debitCreditIndicator")) {
                 String expectedIndicatorType = rules.get("debitCreditIndicator")
-                    .get(debitCreditIndicator).asText();
-                
+                        .get(debitCreditIndicator).asText();
+
                 // Get the debitCreditIndicatorType from canonical response
                 String actualIndicatorType = getJsonValue(actualJson, getCanonicalPaths(de).get(1));
-                
+
                 if (expectedIndicatorType.equals(actualIndicatorType)) {
-                    result.addPassedField(de, expected, 
-                        String.format("%s (Amount: %s, Type: %s)", 
-                            actualValue, normalizedActual, actualIndicatorType));
+                    result.addPassedField(de, expected,
+                            String.format("%s (Amount: %s, Type: %s)",
+                                    actualValue, normalizedActual, actualIndicatorType));
                     return true;
                 } else {
-                    result.addFailedField(de, expected, 
-                        String.format("%s (Amount matches but expected type %s, got %s)", 
-                            actualValue, expectedIndicatorType, actualIndicatorType));
+                    result.addFailedField(de, expected,
+                            String.format("%s (Amount matches but expected type %s, got %s)",
+                                    actualValue, expectedIndicatorType, actualIndicatorType));
                     return false;
                 }
             }
@@ -927,7 +878,7 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                "Failed to validate amount: " + e.getMessage());
+                    "Failed to validate amount: " + e.getMessage());
             return false;
         }
     }
@@ -942,16 +893,16 @@ public class CreateIsoMessage  {
 
             // Check if this field is part of a paired datetime
             if (format.has("pairedField")) {
-                JsonNode paired = format.get("format").get("pairedField");
+                JsonNode paired = format.get("pairedField");
                 String otherField = paired.get("field").asText();
                 String fieldType = paired.get("type").asText();
-                
+
                 // Get the other field's value from the ISO message
                 String otherValue = isoFields.get(Integer.parseInt(otherField));
                 if (otherValue == null) {
                     result.addFailedField(de, expected,
-                        String.format("Paired field DE %s not found - both DE %s and DE %s are needed for datetime validation", 
-                            otherField, de, otherField));
+                            String.format("Paired field DE %s not found - both DE %s and DE %s are needed for datetime validation",
+                                    otherField, de, otherField));
                     return false;
                 }
 
@@ -968,7 +919,7 @@ public class CreateIsoMessage  {
             return validateSingleDateTime(de, expected, actual, result);
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+                    actual + " (Failed to parse datetime: " + e.getMessage() + ")");
             return false;
         }
     }
@@ -984,33 +935,33 @@ public class CreateIsoMessage  {
             String hour = combinedValue.substring(4, 6);
             String minute = combinedValue.substring(6, 8);
             String second = combinedValue.substring(8, 10);
-            
+
             // Get current year
             int year = Calendar.getInstance().get(Calendar.YEAR);
-            
+
             // Create expected datetime string
             String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
-                year, month, day, hour, minute, second);
-            
+                    year, month, day, hour, minute, second);
+
             // Compare ignoring timezone
             if (actual.startsWith(expectedDateTime)) {
                 // Add success result for both fields
-                String successMessage = String.format("%s (Validated with DE %s and DE %s)", 
-                    actual, de1, de2);
+                String successMessage = String.format("%s (Validated with DE %s and DE %s)",
+                        actual, de1, de2);
                 result.addPassedField(de1, combinedValue, successMessage);
                 result.addPassedField(de2, combinedValue, successMessage);
                 return true;
             }
-            
+
             // Add failure result for both fields
-            String failureMessage = String.format("%s (Expected format: %s from DE %s and DE %s)", 
-                actual, expectedDateTime, de1, de2);
+            String failureMessage = String.format("%s (Expected format: %s from DE %s and DE %s)",
+                    actual, expectedDateTime, de1, de2);
             result.addFailedField(de1, combinedValue, failureMessage);
             result.addFailedField(de2, combinedValue, failureMessage);
             return false;
         } catch (Exception e) {
-            String errorMessage = String.format("%s (Failed to parse paired datetime from DE %s and DE %s: %s)", 
-                actual, de1, de2, e.getMessage());
+            String errorMessage = String.format("%s (Failed to parse paired datetime from DE %s and DE %s: %s)",
+                    actual, de1, de2, e.getMessage());
             result.addFailedField(de1, combinedValue, errorMessage);
             result.addFailedField(de2, combinedValue, errorMessage);
             return false;
@@ -1028,26 +979,26 @@ public class CreateIsoMessage  {
             String hour = expected.substring(4, 6);
             String minute = expected.substring(6, 8);
             String second = expected.substring(8, 10);
-            
+
             // Get current year
             int year = Calendar.getInstance().get(Calendar.YEAR);
-            
+
             // Create expected datetime string
             String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
-                year, month, day, hour, minute, second);
-            
+                    year, month, day, hour, minute, second);
+
             // Compare ignoring timezone
             if (actual.startsWith(expectedDateTime)) {
                 result.addPassedField(de, expected, actual);
                 return true;
             }
-            
-            result.addFailedField(de, expected + 
-                String.format(" (Expected format: %s)", expectedDateTime), actual);
+
+            result.addFailedField(de, expected +
+                    String.format(" (Expected format: %s)", expectedDateTime), actual);
             return false;
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+                    actual + " (Failed to parse datetime: " + e.getMessage() + ")");
             return false;
         }
     }
@@ -1063,18 +1014,18 @@ public class CreateIsoMessage  {
 
             // For currency code, just compare the numeric values directly
             String normalizedExpected = expected.replaceFirst("^0+", ""); // Remove leading zeros
-            
+
             if (normalizedExpected.equals(actualValue)) {
                 result.addPassedField(de, expected, actualValue);
                 return true;
             }
-            
+
             result.addFailedField(de, expected, actualValue);
             return false;
 
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                "Failed to validate currency: " + e.getMessage());
+                    "Failed to validate currency: " + e.getMessage());
             return false;
         }
     }
@@ -1086,7 +1037,7 @@ public class CreateIsoMessage  {
         try {
             // Ensure the expected value is padded to full length if shorter
             String paddedExpected = String.format("%-40s", expected).substring(0, 40);
-            
+
             // Parse the expected value into sub-elements based on fixed positions
             String nameAndAddress = paddedExpected.substring(0, 23).trim();
             String city = paddedExpected.substring(23, 36).trim();
@@ -1107,9 +1058,9 @@ public class CreateIsoMessage  {
             boolean allMatch = addressMatch && cityMatch && stateMatch && countryMatch;
 
             // Just show the canonical values
-            String canonicalValue = String.format("%s, %s, %s %s", 
-                actualAddress, actualCity, actualState, actualCountry);
-            
+            String canonicalValue = String.format("%s, %s, %s %s",
+                    actualAddress, actualCity, actualState, actualCountry);
+
             if (allMatch) {
                 result.addPassedField(de, expected, canonicalValue);
             } else {
@@ -1119,7 +1070,7 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                "Failed to validate merchant location: " + e.getMessage());
+                    "Failed to validate merchant location: " + e.getMessage());
             return false;
         }
     }
@@ -1165,22 +1116,21 @@ public class CreateIsoMessage  {
     private static Map<String, String> extractDEValuesFromExcel(Row row) {
         Map<String, String> deValues = new HashMap<>();
         Row headerRow = row.getSheet().getRow(0);
-        
-        // Start from Column B (index 1) and go to Column CJ (index 87)
-        for (int colNum = 1; colNum <= 87; colNum++) {
+
+        for (int colNum = 1; colNum <= 88; colNum++) {
             Cell headerCell = headerRow.getCell(colNum);
             Cell dataCell = row.getCell(colNum);
-            
+
             if (headerCell != null && dataCell != null) {
                 String de = getCellValueAsString(headerCell).trim();
                 String value = getCellValueAsString(dataCell).trim();
-                
+
                 if (!de.isEmpty() && !value.isEmpty()) {
                     deValues.put(de, value);
                 }
             }
         }
-        
+
         return deValues;
     }
 
@@ -1190,14 +1140,14 @@ public class CreateIsoMessage  {
     private static JsonNode getValueFromJsonPath(JsonNode rootNode, String path) {
         String[] parts = path.split("\\.");
         JsonNode current = rootNode;
-        
+
         for (String part : parts) {
             current = current.path(part);
             if (current.isMissingNode()) {
                 return null;
             }
         }
-        
+
         return current;
     }
 
@@ -1206,29 +1156,29 @@ public class CreateIsoMessage  {
      */
     public static class ValidationResult {
         private final Map<String, FieldResult> results = new HashMap<>();
-        
+
         public void addPassedField(String de, String expected, String actual) {
             results.put(de, new FieldResult(FieldStatus.PASSED, expected, actual));
         }
-        
+
         public void addFailedField(String de, String expected, String actual) {
             results.put(de, new FieldResult(FieldStatus.FAILED, expected, actual));
         }
-        
+
         public void addSkippedField(String de, String expected, String reason) {
             results.put(de, new FieldResult(FieldStatus.SKIPPED, expected, reason));
         }
-        
+
         public Map<String, FieldResult> getResults() {
             return results;
         }
 
         public void printResults() {
             System.out.println("\n=== Validation Results ===");
-            System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s", 
-                "DE", "Status", "ISO Value", "Canonical Value", "Mapping"));
+            System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
+                    "DE", "Status", "ISO Value", "Canonical Value", "Mapping"));
             System.out.println("-".repeat(120));
-            
+
             // Sort the results by DE number for consistent display
             new TreeMap<>(results).forEach((de, result) -> {
                 try {
@@ -1244,7 +1194,7 @@ public class CreateIsoMessage  {
                             });
                         }
                     }
-                    
+
                     // Special handling for DE 43 mapping display
                     String canonicalPath;
                     if (de.equals("43")) {
@@ -1255,54 +1205,54 @@ public class CreateIsoMessage  {
 
                     // Format ISO value to show original value and any paired values
                     String isoValue = formatIsoValue(de, result);
-                    
+
                     // Format canonical value with any relevant conversion info
                     String canonicalValue = formatCanonicalValue(de, result);
-                    
+
                     System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
-                        de,
-                        result.getStatus().toString(),
-                        truncateOrPad(isoValue, 40),
-                        truncateOrPad(canonicalValue, 40),
-                        canonicalPath
+                            de,
+                            result.getStatus().toString(),
+                            truncateOrPad(isoValue, 40),
+                            truncateOrPad(canonicalValue, 40),
+                            canonicalPath
                     ));
                 } catch (Exception e) {
                     // If there's an error formatting a specific row, print it with error info
                     System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
-                        de,
-                        "ERROR",
-                        "Error formatting result",
-                        e.getMessage(),
-                        "Error"
+                            de,
+                            "ERROR",
+                            "Error formatting result",
+                            e.getMessage(),
+                            "Error"
                     ));
                 }
             });
-            
+
             // Print summary
             long passCount = results.values().stream()
-                .filter(r -> r.getStatus() == FieldStatus.PASSED)
-                .count();
+                    .filter(r -> r.getStatus() == FieldStatus.PASSED)
+                    .count();
             long failCount = results.values().stream()
-                .filter(r -> r.getStatus() == FieldStatus.FAILED)
-                .count();
+                    .filter(r -> r.getStatus() == FieldStatus.FAILED)
+                    .count();
             long skipCount = results.values().stream()
-                .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
-                .count();
+                    .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
+                    .count();
 
             System.out.println("\nSummary:");
             System.out.println("Total Fields: " + results.size());
             System.out.println("Passed: " + passCount);
             System.out.println("Failed: " + failCount);
-            System.out.println("Skipped: " + skipCount + 
-                (skipCount > 0 ? " (Fields not canonicalized or requiring special handling)" : ""));
+            System.out.println("Skipped: " + skipCount +
+                    (skipCount > 0 ? " (Fields not canonicalized or requiring special handling)" : ""));
 
             // If there are skipped fields, show them and their reasons
             if (skipCount > 0) {
                 System.out.println("\nSkipped Fields:");
                 results.entrySet().stream()
-                    .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
-                    .forEach(e -> System.out.println(String.format("DE %s: %s", 
-                        e.getKey(), e.getValue().getActual())));
+                        .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                        .forEach(e -> System.out.println(String.format("DE %s: %s",
+                                e.getKey(), e.getValue().getActual())));
             }
         }
 
@@ -1314,14 +1264,14 @@ public class CreateIsoMessage  {
             JsonNode config = fieldConfig.get(de);
             if (config != null && config.has("validation")) {
                 JsonNode validation = config.get("validation");
-                
+
                 try {
                     // For paired datetime fields
                     if (validation.has("format") && validation.get("format").has("pairedField")) {
                         JsonNode paired = validation.get("format").get("pairedField");
                         String fieldType = paired.get("type").asText();
                         String value = result.getExpected();
-                        
+
                         // Extract only the relevant portion based on field type
                         if ("date".equals(fieldType)) {
                             // For date field (DE 13), show only MMDD
@@ -1333,7 +1283,7 @@ public class CreateIsoMessage  {
                             return String.format("%s (Time component)", timeComponent);
                         }
                     }
-                    
+
                     // For currency codes
                     if (validation.has("type") && "currency".equals(validation.get("type").asText())) {
                         return String.format("%s (Numeric code)", result.getExpected());
@@ -1343,7 +1293,7 @@ public class CreateIsoMessage  {
                     System.out.println("Warning: Error formatting ISO value for DE " + de + ": " + e.getMessage());
                 }
             }
-            
+
             return result.getExpected();
         }
 
@@ -1355,13 +1305,13 @@ public class CreateIsoMessage  {
             JsonNode config = fieldConfig.get(de);
             if (config != null && config.has("validation")) {
                 JsonNode validation = config.get("validation");
-                
+
                 try {
                     // For paired datetime fields
                     if (validation.has("format") && validation.get("format").has("pairedField")) {
                         JsonNode paired = validation.get("format").get("pairedField");
                         String fieldType = paired.get("type").asText();
-                        
+
                         // Show which component this field contributed to the combined datetime
                         if ("date".equals(fieldType)) {
                             return result.getActual() + " (Combined with DE 12 for full datetime)";
@@ -1369,7 +1319,7 @@ public class CreateIsoMessage  {
                             return result.getActual() + " (Combined with DE 13 for full datetime)";
                         }
                     }
-                    
+
                     // For currency codes
                     if (validation.has("type")) {
                         String type = validation.get("type").asText();
@@ -1384,7 +1334,7 @@ public class CreateIsoMessage  {
                     System.out.println("Warning: Error formatting canonical value for DE " + de + ": " + e.getMessage());
                 }
             }
-            
+
             return result.getActual();
         }
 
@@ -1398,7 +1348,7 @@ public class CreateIsoMessage  {
             return String.format("%-" + length + "s", str);
         }
     }
-    
+
     /**
      * Enum to represent field validation status
      */
@@ -1419,7 +1369,7 @@ public class CreateIsoMessage  {
             return display;
         }
     }
-    
+
     /**
      * Class to hold individual field validation results
      */
@@ -1427,13 +1377,13 @@ public class CreateIsoMessage  {
         private final FieldStatus status;
         private final String expected;
         private final String actual;
-        
+
         public FieldResult(FieldStatus status, String expected, String actual) {
             this.status = status;
             this.expected = expected;
             this.actual = actual;
         }
-        
+
         public FieldStatus getStatus() { return status; }
         public String getExpected() { return expected; }
         public String getActual() { return actual; }
@@ -1446,7 +1396,7 @@ public class CreateIsoMessage  {
         try {
             JsonNode actualJson = objectMapper.readTree(actual);
             String actualValue = getJsonValue(actualJson, "transaction.channel.channelType");
-            
+
             // Determine expected canonical value based on ISO value
             String expectedCanonical;
             switch (expected) {
@@ -1458,13 +1408,14 @@ public class CreateIsoMessage  {
                     break;
                 case "010":
                 case "012":
+                case "090":
                 case "091":
                     expectedCanonical = "ONLINE";
                     break;
                 default:
                     expectedCanonical = expected; // Keep original for unmatched values
             }
-            
+
             if (expectedCanonical.equals(actualValue)) {
                 result.addPassedField(de, expected, actualValue);
                 return true;
@@ -1487,46 +1438,46 @@ public class CreateIsoMessage  {
             JsonNode positions = rules.get("positions");
             boolean allValid = true;
             StringBuilder validationDetails = new StringBuilder();
-            
+
             // Validate Message Type (positions 1-4)
             String messageType = expected.substring(0, 4);
             String expectedType = positions.get("messageType").get("mapping").get(messageType).asText();
             String actualType = getJsonValue(actualJson, "transaction.originalTransaction.transactionType");
             boolean messageTypeValid = expectedType.equals(actualType);
-            validationDetails.append(String.format("Message Type: %s->%s (%s), ", 
-                messageType, expectedType, messageTypeValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Message Type: %s->%s (%s), ",
+                    messageType, expectedType, messageTypeValid ? "✓" : "✗"));
             allValid &= messageTypeValid;
 
             // Validate System Trace Audit Number (positions 5-10)
             String stan = expected.substring(4, 10).replaceFirst("^0+", ""); // Remove leading zeros
             String actualStan = getJsonValue(actualJson, "transaction.originalTransaction.systemTraceAuditNumber");
             boolean stanValid = stan.equals(actualStan);
-            validationDetails.append(String.format("STAN: %s (%s), ", 
-                stan, stanValid ? "✓" : "✗"));
+            validationDetails.append(String.format("STAN: %s (%s), ",
+                    stan, stanValid ? "✓" : "✗"));
             allValid &= stanValid;
 
             // Validate Transmission Date Time (positions 11-20)
             String dateTime = expected.substring(10, 20);
             String actualDateTime = getJsonValue(actualJson, "transaction.originalTransaction.transmissionDateTime");
             boolean dateTimeValid = dateTime.equals(actualDateTime);
-            validationDetails.append(String.format("DateTime: %s (%s), ", 
-                dateTime, dateTimeValid ? "✓" : "✗"));
+            validationDetails.append(String.format("DateTime: %s (%s), ",
+                    dateTime, dateTimeValid ? "✓" : "✗"));
             allValid &= dateTimeValid;
 
             // Validate Acquirer ID (positions 21-31)
             String acquirerId = expected.substring(20, 31).replaceFirst("^0+", ""); // Remove leading zeros
             String actualAcquirerId = getJsonValue(actualJson, "transaction.originalTransaction.acquirer.acquirerId");
             boolean acquirerIdValid = acquirerId.equals(actualAcquirerId);
-            validationDetails.append(String.format("AcquirerID: %s (%s), ", 
-                acquirerId, acquirerIdValid ? "✓" : "✗"));
+            validationDetails.append(String.format("AcquirerID: %s (%s), ",
+                    acquirerId, acquirerIdValid ? "✓" : "✗"));
             allValid &= acquirerIdValid;
 
             // Validate Forwarding Institution ID (positions 32-42)
             String forwardingId = expected.substring(31, 42).replaceFirst("^0+", ""); // Remove leading zeros
             String actualForwardingId = getJsonValue(actualJson, "transaction.originalTransaction.forwardingInstitution.forwardingInstitutionId");
             boolean forwardingIdValid = forwardingId.equals(actualForwardingId);
-            validationDetails.append(String.format("ForwardingID: %s (%s)", 
-                forwardingId, forwardingIdValid ? "✓" : "✗"));
+            validationDetails.append(String.format("ForwardingID: %s (%s)",
+                    forwardingId, forwardingIdValid ? "✓" : "✗"));
             allValid &= forwardingIdValid;
 
             // Add validation result with detailed breakdown
@@ -1539,7 +1490,7 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                "Failed to validate original data elements: " + e.getMessage());
+                    "Failed to validate original data elements: " + e.getMessage());
             return false;
         }
     }
@@ -1553,26 +1504,26 @@ public class CreateIsoMessage  {
             JsonNode positions = rules.get("positions");
             boolean allValid = true;
             StringBuilder validationDetails = new StringBuilder();
-            
+
             // Validate Terminal Class (positions 1-3)
             JsonNode terminalClass = positions.get("terminalClass");
             String terminalClassValue = expected.substring(
-                terminalClass.get("start").asInt() - 1, 
-                terminalClass.get("end").asInt()
+                    terminalClass.get("start").asInt() - 1,
+                    terminalClass.get("end").asInt()
             );
-            
+
             // Validate each terminal class component with enum mappings
             JsonNode components = terminalClass.get("components");
-            
+
             // AttendanceIndicator (position 1)
             Map<String, String> attendanceMapping = new HashMap<>();
             attendanceMapping.put("0", "ATTENDED");
             attendanceMapping.put("1", "UNATTENDED");
             attendanceMapping.put("2", "RESERVED");
             validateComponentWithMapping(components.get("attendanceIndicator"), terminalClassValue.substring(0, 1),
-                actualJson, "transaction.nationalPOSConditionCode.terminalClass.AttendanceIndicator",
-                "Attendance", validationDetails, allValid, attendanceMapping);
-            
+                    actualJson, "transaction.nationalPOSConditionCode.terminalClass.AttendanceIndicator",
+                    "Attendance", validationDetails, allValid, attendanceMapping);
+
             // TerminalOperation (position 2)
             Map<String, String> operationMapping = new HashMap<>();
             operationMapping.put("0", "CUSTOMER_OPERATED");
@@ -1580,27 +1531,27 @@ public class CreateIsoMessage  {
             operationMapping.put("2", "ADMINISTRATIVE");
             operationMapping.put("3", "TERMINAL_OPERATION_RESERVED");
             validateComponentWithMapping(components.get("terminalOperation"), terminalClassValue.substring(1, 2),
-                actualJson, "transaction.nationalPOSConditionCode.terminalClass.terminalOperation",
-                "Operation", validationDetails, allValid, operationMapping);
-            
+                    actualJson, "transaction.nationalPOSConditionCode.terminalClass.terminalOperation",
+                    "Operation", validationDetails, allValid, operationMapping);
+
             // TerminalLocation (position 3)
             Map<String, String> locationMapping = new HashMap<>();
             locationMapping.put("0", "ON_PREMISE");
             locationMapping.put("1", "OFF_PREMISE");
             locationMapping.put("2", "TERMINAL_LOCATION_RESERVED");
             validateComponentWithMapping(components.get("terminalLocation"), terminalClassValue.substring(2, 3),
-                actualJson, "transaction.nationalPOSConditionCode.terminalClass.terminalLocation",
-                "Location", validationDetails, allValid, locationMapping);
+                    actualJson, "transaction.nationalPOSConditionCode.terminalClass.terminalLocation",
+                    "Location", validationDetails, allValid, locationMapping);
 
             // Validate Presentation Type (positions 4-7)
             JsonNode presentationType = positions.get("presentationType");
             String presentationValue = expected.substring(
-                presentationType.get("start").asInt() - 1,
-                presentationType.get("end").asInt()
+                    presentationType.get("start").asInt() - 1,
+                    presentationType.get("end").asInt()
             );
-            
+
             components = presentationType.get("components");
-            
+
             // CardholderPresence (position 4)
             Map<String, String> cardholderPresenceMapping = new HashMap<>();
             cardholderPresenceMapping.put("0", "CUSTOMER_PRESENT");
@@ -1614,9 +1565,9 @@ public class CreateIsoMessage  {
             cardholderPresenceMapping.put("8", "DEFERRED_AUTHORIZATION");
             cardholderPresenceMapping.put("9", "INSTALLMENT_PAYMENT");
             validateComponentWithMapping(components.get("cardHolderPresence"), presentationValue.substring(0, 1),
-                actualJson, "transaction.nationalPOSConditionCode.presentationType.cardHolderPresence",
-                "CardholderPresence", validationDetails, allValid, cardholderPresenceMapping);
-            
+                    actualJson, "transaction.nationalPOSConditionCode.presentationType.cardHolderPresence",
+                    "CardholderPresence", validationDetails, allValid, cardholderPresenceMapping);
+
             // CardPresence (position 5)
             Map<String, String> cardPresenceMapping = new HashMap<>();
             cardPresenceMapping.put("0", "CARD_PRESENT");
@@ -1624,18 +1575,18 @@ public class CreateIsoMessage  {
             cardPresenceMapping.put("2", "CARD_PRESENCE_RESERVED");
             cardPresenceMapping.put("3", "PRE_AUTHORIZED_PURCHASE");
             validateComponentWithMapping(components.get("cardPresence"), presentationValue.substring(1, 2),
-                actualJson, "transaction.nationalPOSConditionCode.presentationType.cardPresence",
-                "CardPresence", validationDetails, allValid, cardPresenceMapping);
-            
+                    actualJson, "transaction.nationalPOSConditionCode.presentationType.cardPresence",
+                    "CardPresence", validationDetails, allValid, cardPresenceMapping);
+
             // CardRetentionCapability (position 6)
             Map<String, String> retentionMapping = new HashMap<>();
             retentionMapping.put("0", "NO_CARD_RETENTION");
             retentionMapping.put("1", "HAS_CARD_RETENTION");
             retentionMapping.put("2", "CARD_RETENTION_CAPABILITY_RESERVED");
             validateComponentWithMapping(components.get("cardRetentionCapability"), presentationValue.substring(2, 3),
-                actualJson, "transaction.nationalPOSConditionCode.presentationType.cardRetentionCapability",
-                "RetentionCapability", validationDetails, allValid, retentionMapping);
-            
+                    actualJson, "transaction.nationalPOSConditionCode.presentationType.cardRetentionCapability",
+                    "RetentionCapability", validationDetails, allValid, retentionMapping);
+
             // TransactionStatus (position 7)
             Map<String, String> transactionStatusMapping = new HashMap<>();
             transactionStatusMapping.put("0", "ORIGINAL_PRESENTMENT");
@@ -1647,14 +1598,14 @@ public class CreateIsoMessage  {
             transactionStatusMapping.put("6", "TRANSACTION_STATUS_RESERVED");
             transactionStatusMapping.put("7", "ACCOUNT_INQUIRY");
             validateComponentWithMapping(components.get("transactionStatus"), presentationValue.substring(3, 4),
-                actualJson, "transaction.nationalPOSConditionCode.presentationType.transactionStatus",
-                "TransactionStatus", validationDetails, allValid, transactionStatusMapping);
+                    actualJson, "transaction.nationalPOSConditionCode.presentationType.transactionStatus",
+                    "TransactionStatus", validationDetails, allValid, transactionStatusMapping);
 
             // Validate Security Condition (position 8)
             JsonNode securityCondition = positions.get("securityCondition");
             String securityValue = expected.substring(
-                securityCondition.get("position").asInt() - 1,
-                securityCondition.get("position").asInt()
+                    securityCondition.get("position").asInt() - 1,
+                    securityCondition.get("position").asInt()
             );
             Map<String, String> securityMapping = new HashMap<>();
             securityMapping.put("0", "SECURITY_CONDITION_UNKNOWN");
@@ -1671,14 +1622,14 @@ public class CreateIsoMessage  {
             securityMapping.put("11", "INTERNET_PINNED_DEBIT_TRANSACTION");
             securityMapping.put("12", "SECURE_REMOTE_COMMERCE_SRC");
             validateComponentWithMapping(securityCondition, securityValue,
-                actualJson, "transaction.nationalPOSConditionCode.SecurityCondition",
-                "Security", validationDetails, allValid, securityMapping);
+                    actualJson, "transaction.nationalPOSConditionCode.SecurityCondition",
+                    "Security", validationDetails, allValid, securityMapping);
 
             // Validate Terminal Type (positions 9-10)
             JsonNode terminalType = positions.get("terminalType");
             String terminalTypeValue = expected.substring(
-                terminalType.get("start").asInt() - 1,
-                terminalType.get("end").asInt()
+                    terminalType.get("start").asInt() - 1,
+                    terminalType.get("end").asInt()
             );
             Map<String, String> terminalTypeMapping = new HashMap<>();
             terminalTypeMapping.put("00", "TERMINAL_TYPE_UNKNOWN");
@@ -1710,14 +1661,14 @@ public class CreateIsoMessage  {
             terminalTypeMapping.put("26", "ELECTRONIC_COMMERCE");
             terminalTypeMapping.put("27", "MICR_TERMINALS_POS");
             validateComponentWithMapping(terminalType, terminalTypeValue,
-                actualJson, "transaction.nationalPOSConditionCode.terminalType",
-                "TerminalType", validationDetails, allValid, terminalTypeMapping);
+                    actualJson, "transaction.nationalPOSConditionCode.terminalType",
+                    "TerminalType", validationDetails, allValid, terminalTypeMapping);
 
             // Validate Card Data Input Capability (position 11)
             JsonNode cardDataInput = positions.get("cardDataInputCapability");
             String cardDataValue = expected.substring(
-                cardDataInput.get("position").asInt() - 1,
-                cardDataInput.get("position").asInt()
+                    cardDataInput.get("position").asInt() - 1,
+                    cardDataInput.get("position").asInt()
             );
             Map<String, String> cardDataMapping = new HashMap<>();
             cardDataMapping.put("0", "CARD_DATA_INPUT_CAPABILITY_UNKNOWN");
@@ -1735,8 +1686,8 @@ public class CreateIsoMessage  {
             cardDataMapping.put("12", "MAG_STRIPE_EMV_ICC");
             cardDataMapping.put("13", "SECURE_CARD_LESS_ENTRY");
             validateComponentWithMapping(cardDataInput, cardDataValue,
-                actualJson, "transaction.nationalPOSConditionCode.cardDataInputCapability",
-                "InputCapability", validationDetails, allValid, cardDataMapping);
+                    actualJson, "transaction.nationalPOSConditionCode.cardDataInputCapability",
+                    "InputCapability", validationDetails, allValid, cardDataMapping);
 
             // Add validation result with detailed breakdown
             if (allValid) {
@@ -1748,7 +1699,7 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             result.addFailedField(de, expected,
-                "Failed to validate POS condition code: " + e.getMessage());
+                    "Failed to validate POS condition code: " + e.getMessage());
             return false;
         }
     }
@@ -1757,16 +1708,16 @@ public class CreateIsoMessage  {
      * Helper method to validate a single component with enum mapping
      */
     private static void validateComponentWithMapping(JsonNode component, String value,
-            JsonNode actualJson, String canonicalPath, String componentName,
-            StringBuilder details, boolean allValid, Map<String, String> mapping) {
+                                                     JsonNode actualJson, String canonicalPath, String componentName,
+                                                     StringBuilder details, boolean allValid, Map<String, String> mapping) {
         try {
             String actualValue = getJsonValue(actualJson, canonicalPath);
             String expectedValue = mapping.getOrDefault(value, value);
-            
+
             boolean isValid = expectedValue.equals(actualValue);
             allValid &= isValid;
             details.append(String.format("%s: %s->%s (%s), ",
-                componentName, value, expectedValue, isValid ? "✓" : "✗"));
+                    componentName, value, expectedValue, isValid ? "✓" : "✗"));
         } catch (Exception e) {
             allValid = false;
             details.append(String.format("%s: Error (%s), ", componentName, e.getMessage()));
@@ -1796,8 +1747,8 @@ public class CreateIsoMessage  {
             String expectedFeeType = positions.get("feeType").get("mapping").get(feeType).asText();
             String actualFeeType = fee.path("feeType").asText();
             boolean feeTypeValid = expectedFeeType.equals(actualFeeType);
-            validationDetails.append(String.format("Fee Type: %s->%s (%s), ", 
-                feeType, expectedFeeType, feeTypeValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Fee Type: %s->%s (%s), ",
+                    feeType, expectedFeeType, feeTypeValid ? "✓" : "✗"));
             allValid &= feeTypeValid;
 
             // Validate Settlement Memo Indicator (position 3)
@@ -1805,8 +1756,8 @@ public class CreateIsoMessage  {
             String expectedSettleMemo = positions.get("settleMemoIndicator").get("mapping").get(settleMemo).asText();
             String actualSettleMemo = fee.path("settleMemoIndicator").asText();
             boolean settleMemoValid = expectedSettleMemo.equals(actualSettleMemo);
-            validationDetails.append(String.format("Settle Memo: %s->%s (%s), ", 
-                settleMemo, expectedSettleMemo, settleMemoValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Settle Memo: %s->%s (%s), ",
+                    settleMemo, expectedSettleMemo, settleMemoValid ? "✓" : "✗"));
             allValid &= settleMemoValid;
 
             // Validate Decimalization Indicator (position 4)
@@ -1814,21 +1765,21 @@ public class CreateIsoMessage  {
             String expectedDecimalization = positions.get("decimalizationIndicator").get("mapping").get(decimalization).asText();
             String actualDecimalization = fee.path("decimalizationIndicator").asText();
             boolean decimalizationValid = expectedDecimalization.equals(actualDecimalization);
-            validationDetails.append(String.format("Decimalization: %s (%s), ", 
-                decimalization, decimalizationValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Decimalization: %s (%s), ",
+                    decimalization, decimalizationValid ? "✓" : "✗"));
             allValid &= decimalizationValid;
 
             // Validate Fee Amount (positions 5-13)
             JsonNode feeAmount = positions.get("feeAmount");
             String feeAmountValue = expected.substring(4, 13);
-            
+
             // Validate Debit/Credit Indicator (position 5)
             String feeIndicator = feeAmountValue.substring(0, 1);
             String expectedFeeIndicator = feeAmount.get("components").get("debitCreditIndicator").get("mapping").get(feeIndicator).asText();
             String actualFeeIndicator = fee.path("fee").path("amount").path("debitCreditIndicatorType").asText();
             boolean feeIndicatorValid = expectedFeeIndicator.equals(actualFeeIndicator);
-            validationDetails.append(String.format("Fee Indicator: %s->%s (%s), ", 
-                feeIndicator, expectedFeeIndicator, feeIndicatorValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Fee Indicator: %s->%s (%s), ",
+                    feeIndicator, expectedFeeIndicator, feeIndicatorValid ? "✓" : "✗"));
             allValid &= feeIndicatorValid;
 
             // Validate Fee Amount (positions 6-13)
@@ -1836,21 +1787,21 @@ public class CreateIsoMessage  {
             String normalizedFeeAmount = String.valueOf(Long.parseLong(feeAmountStr)); // Remove leading zeros
             String actualFeeAmount = fee.path("fee").path("amount").path("amount").asText();
             boolean feeAmountValid = normalizedFeeAmount.equals(actualFeeAmount);
-            validationDetails.append(String.format("Fee Amount: %s->%s (%s), ", 
-                feeAmountStr, normalizedFeeAmount, feeAmountValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Fee Amount: %s->%s (%s), ",
+                    feeAmountStr, normalizedFeeAmount, feeAmountValid ? "✓" : "✗"));
             allValid &= feeAmountValid;
 
             // Validate Settlement Amount (positions 14-22)
             JsonNode settlementAmount = positions.get("settlementAmount");
             String settlementValue = expected.substring(13, 22);
-            
+
             // Validate Settlement Debit/Credit Indicator (position 14)
             String settlementIndicator = settlementValue.substring(0, 1);
             String expectedSettlementIndicator = settlementAmount.get("components").get("debitCreditIndicator").get("mapping").get(settlementIndicator).asText();
             String actualSettlementIndicator = fee.path("settlement").path("settlementAmount").path("debitCreditIndicatorType").asText();
             boolean settlementIndicatorValid = expectedSettlementIndicator.equals(actualSettlementIndicator);
-            validationDetails.append(String.format("Settlement Indicator: %s->%s (%s), ", 
-                settlementIndicator, expectedSettlementIndicator, settlementIndicatorValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Settlement Indicator: %s->%s (%s), ",
+                    settlementIndicator, expectedSettlementIndicator, settlementIndicatorValid ? "✓" : "✗"));
             allValid &= settlementIndicatorValid;
 
             // Validate Settlement Amount (positions 15-22)
@@ -1858,8 +1809,8 @@ public class CreateIsoMessage  {
             String normalizedSettlementAmount = String.valueOf(Long.parseLong(settlementAmountStr)); // Remove leading zeros
             String actualSettlementAmount = fee.path("settlement").path("settlementAmount").path("amount").asText();
             boolean settlementAmountValid = normalizedSettlementAmount.equals(actualSettlementAmount);
-            validationDetails.append(String.format("Settlement Amount: %s->%s (%s)", 
-                settlementAmountStr, normalizedSettlementAmount, settlementAmountValid ? "✓" : "✗"));
+            validationDetails.append(String.format("Settlement Amount: %s->%s (%s)",
+                    settlementAmountStr, normalizedSettlementAmount, settlementAmountValid ? "✓" : "✗"));
             allValid &= settlementAmountValid;
 
             if (allValid) {
