@@ -756,11 +756,18 @@ public class CreateIsoMessage  {
      * Check if a DE requires special validation
      */
     private static boolean hasSpecialValidation(String de) {
+        System.out.println("\nChecking special validation for DE " + de);
         JsonNode config = fieldConfig.get(de);
         if (config != null && config.has("validation")) {
             JsonNode validation = config.get("validation");
-            return validation.has("type");
+            boolean hasType = validation.has("type");
+            System.out.println("DE " + de + " has validation type: " + hasType);
+            if (hasType) {
+                System.out.println("Validation type: " + validation.get("type").asText());
+            }
+            return hasType;
         }
+        System.out.println("DE " + de + " has no validation config");
         return false;
     }
 
@@ -794,11 +801,13 @@ public class CreateIsoMessage  {
      * Handles special validation cases for specific DEs based on config
      */
     private static boolean validateSpecialCase(String de, String expected, String actual, ValidationResult result) {
+        System.out.println("\nValidating special case for DE " + de);
         JsonNode config = fieldConfig.get(de);
         if (config != null && config.has("validation")) {
             JsonNode validation = config.get("validation");
             if (validation.has("type")) {
                 String validationType = validation.get("type").asText();
+                System.out.println("Found validation type: " + validationType);
                 switch (validationType) {
                     case "amount":
                         return validateAmount(de, expected, actual, result, validation.get("rules"));
@@ -828,9 +837,16 @@ public class CreateIsoMessage  {
                     case "pos_condition_code":
                         return validatePosConditionCode(de, expected, actual, result, validation.get("rules"));
                     case "additional_fees":
+                        System.out.println("Processing additional_fees validation for DE " + de);
                         return validateAdditionalFees(de, expected, actual, result, validation.get("rules"));
+                    default:
+                        System.out.println("Unknown validation type: " + validationType);
                 }
+            } else {
+                System.out.println("No validation type found for DE " + de);
             }
+        } else {
+            System.out.println("No validation config found for DE " + de);
         }
 
         // Default comparison for fields without special validation
