@@ -729,10 +729,14 @@ public class CreateIsoMessage  {
 
                 if (allPathsValid) {
                     if (canonicalPaths.size() > 1) {
+                        // Only for multiple paths, show the success message
                         result.addPassedField(de, expectedValue, "All paths validated successfully");
                     } else {
+                        // For single path, just show the actual value
                         JsonNode actualNode = getValueFromJsonPath(canonicalJson, canonicalPaths.get(0).trim());
-                        result.addPassedField(de, expectedValue, actualNode != null ? actualNode.asText() : "");
+                        String actualValue = actualNode != null ? actualNode.asText() : "";
+                        // Let the formatCanonicalValue method handle the formatting
+                        result.addPassedField(de, expectedValue, actualValue);
                     }
                 } else {
                     result.addFailedField(de, expectedValue, validationDetails.toString());
