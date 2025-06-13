@@ -684,7 +684,9 @@ public class CreateIsoMessage  {
 
             List<String> canonicalPaths = getCanonicalPaths(de);
             if (!canonicalPaths.isEmpty()) {
-                boolean foundMatch = false;
+                boolean allPathsValid = true;
+                StringBuilder validationDetails = new StringBuilder();
+
                 for (String jsonPath : canonicalPaths) {
                     // Skip comments or placeholder paths
                     if (jsonPath.contains("-->") || jsonPath.startsWith("Tag :") ||
@@ -698,21 +700,25 @@ public class CreateIsoMessage  {
 
                         // For special validation cases, pass the entire canonical response
                         if (hasSpecialValidation(de)) {
-                            if (validateSpecialCase(de, expectedValue, canonicalResponse, result)) {
-                                foundMatch = true;
-                                break;
+                            allPathsValid &= validateSpecialCase(de, expectedValue, canonicalResponse, result);
+                        } else {
+                            if (!expectedValue.equals(actualValue)) {
+                                allPathsValid = false;
+                                validationDetails.append("Path ").append(jsonPath)
+                                               .append(": expected ").append(expectedValue)
+                                               .append(", got ").append(actualValue).append("; ");
                             }
-                        } else if (expectedValue.equals(actualValue)) {
-                            result.addPassedField(de, expectedValue, actualValue);
-                            foundMatch = true;
-                            break;
                         }
+                    } else {
+                        allPathsValid = false;
+                        validationDetails.append("Path ").append(jsonPath).append(" not found; ");
                     }
                 }
 
-                if (!foundMatch) {
-                    result.addFailedField(de, expectedValue,
-                            "No matching value found in canonical paths: " + String.join(", ", canonicalPaths));
+                if (allPathsValid) {
+                    result.addPassedField(de, expectedValue, "All paths validated successfully");
+                } else {
+                    result.addFailedField(de, expectedValue, validationDetails.toString());
                 }
             } else {
                 result.addFailedField(de, expectedValue, "No canonical mapping found for DE " + de);
