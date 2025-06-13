@@ -1165,7 +1165,30 @@
     "notes": "Includes State/Region Code, County Code, Postal Service Code, and Country Code. Configurable to be passed.",
     "max_length": 17,
     "active": false,
-    "SampleData": "012NPOSGDMAX017"
+    "SampleData": "012NPOSGDMAX017",
+    "validation": {
+      "type": "national_pos_geographic_data",
+      "rules": {
+        "positions": {
+          "state": {
+            "start": 1,
+            "end": 2
+          },
+          "county": {
+            "start": 3,
+            "end": 5
+          },
+          "postalCode": {
+            "start": 6,
+            "end": 14
+          },
+          "countryCode": {
+            "start": 15,
+            "end": 17
+          }
+        }
+      }
+    }
   },
   "60": {
     "name": "Advice/Reversal Reason Code",

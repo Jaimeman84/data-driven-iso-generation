@@ -829,6 +829,9 @@ public class CreateIsoMessage  {
                     case "additional_amounts":
                         System.out.println("Processing additional_amounts validation for DE " + de);
                         return validateAdditionalAmounts(de, expected, actual, result, validation.get("rules"));
+                    case "national_pos_geographic_data":
+                        System.out.println("Processing national_pos_geographic_data validation for DE " + de);
+                        return validateNationalPosGeographicData(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -1957,6 +1960,61 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to validate additional amounts: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Validates DE 59 (National POS Geographic Data) with position-based validation
+     */
+    private static boolean validateNationalPosGeographicData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            JsonNode actualJson = objectMapper.readTree(actual);
+            JsonNode positions = rules.get("positions");
+            boolean allValid = true;
+            StringBuilder validationDetails = new StringBuilder();
+
+            // Validate State (positions 1-2)
+            String state = expected.substring(0, 2);
+            String actualState = getJsonValue(actualJson, "transaction.nationalPOSGeographicData.state");
+            boolean stateValid = state.equals(actualState);
+            validationDetails.append(String.format("State: %s (%s), ",
+                    state, stateValid ? "✓" : "✗"));
+            allValid &= stateValid;
+
+            // Validate County (positions 3-5)
+            String county = expected.substring(2, 5);
+            String actualCounty = getJsonValue(actualJson, "transaction.nationalPOSGeographicData.county");
+            boolean countyValid = county.equals(actualCounty);
+            validationDetails.append(String.format("County: %s (%s), ",
+                    county, countyValid ? "✓" : "✗"));
+            allValid &= countyValid;
+
+            // Validate Postal Code (positions 6-14)
+            String postalCode = expected.substring(5, 14);
+            String actualPostalCode = getJsonValue(actualJson, "transaction.nationalPOSGeographicData.postalCode");
+            boolean postalCodeValid = postalCode.equals(actualPostalCode);
+            validationDetails.append(String.format("Postal Code: %s (%s), ",
+                    postalCode, postalCodeValid ? "✓" : "✗"));
+            allValid &= postalCodeValid;
+
+            // Validate Country Code (positions 15-17)
+            String countryCode = expected.substring(14, 17);
+            String actualCountryCode = getJsonValue(actualJson, "transaction.nationalPOSGeographicData.countryCode");
+            boolean countryCodeValid = countryCode.equals(actualCountryCode);
+            validationDetails.append(String.format("Country Code: %s (%s)",
+                    countryCode, countryCodeValid ? "✓" : "✗"));
+            allValid &= countryCodeValid;
+
+            if (allValid) {
+                result.addPassedField(de, expected, validationDetails.toString());
+            } else {
+                result.addFailedField(de, expected, validationDetails.toString());
+            }
+            return allValid;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to validate national POS geographic data: " + e.getMessage());
             return false;
         }
     }
