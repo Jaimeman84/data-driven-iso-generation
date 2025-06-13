@@ -704,26 +704,24 @@ public class CreateIsoMessage  {
                         } else {
                             if (!expectedValue.equals(actualValue)) {
                                 allPathsValid = false;
-                                // Extract just the attribute name from the path
-                                String attributeName = jsonPath.substring(jsonPath.lastIndexOf(".") + 1);
-                                // Remove array index if present
-                                if (attributeName.contains("[")) {
-                                    attributeName = attributeName.substring(0, attributeName.indexOf("["));
+                                // Get just the final element name
+                                String elementName = jsonPath.substring(jsonPath.lastIndexOf(".") + 1);
+                                if (elementName.contains("[")) {
+                                    elementName = elementName.substring(0, elementName.indexOf("["));
                                 }
-                                validationDetails.append(attributeName)
-                                               .append(": expected ").append(expectedValue)
-                                               .append(", got ").append(actualValue).append("; ");
+                                validationDetails.append(elementName)
+                                               .append(" mismatch; ");
                             }
                         }
                     } else {
                         allPathsValid = false;
-                        // Extract just the attribute name from the path
-                        String attributeName = jsonPath.substring(jsonPath.lastIndexOf(".") + 1);
-                        // Remove array index if present
-                        if (attributeName.contains("[")) {
-                            attributeName = attributeName.substring(0, attributeName.indexOf("["));
+                        // Get just the final element name
+                        String elementName = jsonPath.substring(jsonPath.lastIndexOf(".") + 1);
+                        if (elementName.contains("[")) {
+                            elementName = elementName.substring(0, elementName.indexOf("["));
                         }
-                        validationDetails.append(attributeName).append(" not found; ");
+                        validationDetails.append(elementName)
+                                       .append(" missing; ");
                     }
                 }
 
