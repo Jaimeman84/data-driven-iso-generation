@@ -1329,35 +1329,15 @@ public class CreateIsoMessage  {
             }
 
             JsonNode config = fieldConfig.get(de);
-            if (config != null && config.has("validation")) {
-                JsonNode validation = config.get("validation");
-
-                try {
-                    // For paired datetime fields
-                    if (validation.has("format") && validation.get("format").has("pairedField")) {
-                        JsonNode paired = validation.get("format").get("pairedField");
-                        String fieldType = paired.get("type").asText();
-
-                        // Show which component this field contributed to the combined datetime
-                        if ("date".equals(fieldType)) {
-                            return result.getActual() + " (Combined with DE 12 for full datetime)";
-                        } else if ("time".equals(fieldType)) {
-                            return result.getActual() + " (Combined with DE 13 for full datetime)";
-                        }
-                    }
-
-                    // For currency codes
-                    if (validation.has("type")) {
-                        String type = validation.get("type").asText();
-                        if ("currency".equals(type)) {
-                            return result.getActual() + " (ISO format)";
-                        } else if ("amount".equals(type)) {
-                            return result.getActual() + " (Decimal format)";
-                        }
-                    }
-                } catch (Exception e) {
-                    // If any error occurs during formatting, return the original value
-                    System.out.println("Warning: Error formatting canonical value for DE " + de + ": " + e.getMessage());
+            if (config != null && config.has("canonical")) {
+                JsonNode canonical = config.get("canonical");
+                // For single path fields, show simple value
+                if (canonical.size() == 1) {
+                    return result.getActual();
+                }
+                // For multiple paths that failed, show detailed mismatch info
+                if (canonical.size() > 1 && result.getStatus() == FieldStatus.FAILED) {
+                    return result.getActual(); // This will now contain the detailed mismatch info
                 }
             }
 
