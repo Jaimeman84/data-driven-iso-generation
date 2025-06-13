@@ -704,19 +704,36 @@ public class CreateIsoMessage  {
                         } else {
                             if (!expectedValue.equals(actualValue)) {
                                 allPathsValid = false;
-                                validationDetails.append("Path ").append(jsonPath)
+                                // Extract just the attribute name from the path
+                                String attributeName = jsonPath.substring(jsonPath.lastIndexOf(".") + 1);
+                                // Remove array index if present
+                                if (attributeName.contains("[")) {
+                                    attributeName = attributeName.substring(0, attributeName.indexOf("["));
+                                }
+                                validationDetails.append(attributeName)
                                                .append(": expected ").append(expectedValue)
                                                .append(", got ").append(actualValue).append("; ");
                             }
                         }
                     } else {
                         allPathsValid = false;
-                        validationDetails.append("Path ").append(jsonPath).append(" not found; ");
+                        // Extract just the attribute name from the path
+                        String attributeName = jsonPath.substring(jsonPath.lastIndexOf(".") + 1);
+                        // Remove array index if present
+                        if (attributeName.contains("[")) {
+                            attributeName = attributeName.substring(0, attributeName.indexOf("["));
+                        }
+                        validationDetails.append(attributeName).append(" not found; ");
                     }
                 }
 
                 if (allPathsValid) {
-                    result.addPassedField(de, expectedValue, "All paths validated successfully");
+                    if (canonicalPaths.size() > 1) {
+                        result.addPassedField(de, expectedValue, "All paths validated successfully");
+                    } else {
+                        JsonNode actualNode = getValueFromJsonPath(canonicalJson, canonicalPaths.get(0).trim());
+                        result.addPassedField(de, expectedValue, actualNode != null ? actualNode.asText() : "");
+                    }
                 } else {
                     result.addFailedField(de, expectedValue, validationDetails.toString());
                 }
