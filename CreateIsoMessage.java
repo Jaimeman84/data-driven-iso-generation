@@ -1538,9 +1538,25 @@ public class CreateIsoMessage  {
             // Validate Transmission Date Time (positions 11-20)
             String dateTime = expected.substring(10, 20);
             String actualDateTime = getJsonValue(actualJson, "transaction.originalTransaction.transmissionDateTime");
-            boolean dateTimeValid = dateTime.equals(actualDateTime);
-            validationDetails.append(String.format("DateTime: %s (%s), ",
-                    dateTime, dateTimeValid ? "✓" : "✗"));
+            
+            // Parse the expected date time (MMDDhhmmss format)
+            String month = dateTime.substring(0, 2);
+            String day = dateTime.substring(2, 4);
+            String hour = dateTime.substring(4, 6);
+            String minute = dateTime.substring(6, 8);
+            String second = dateTime.substring(8, 10);
+
+            // Get current year
+            int year = Calendar.getInstance().get(Calendar.YEAR);
+
+            // Create expected datetime string in UTC format
+            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
+                    year, month, day, hour, minute, second);
+
+            // Compare ignoring timezone and any additional precision
+            boolean dateTimeValid = actualDateTime.startsWith(expectedDateTime);
+            validationDetails.append(String.format("DateTime: %s->%s (%s), ",
+                    dateTime, actualDateTime, dateTimeValid ? "✓" : "✗"));
             allValid &= dateTimeValid;
 
             // Validate Acquirer ID (positions 21-31)
