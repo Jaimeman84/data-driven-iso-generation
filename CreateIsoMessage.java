@@ -826,6 +826,9 @@ public class CreateIsoMessage  {
                     case "additional_fees":
                         System.out.println("Processing additional_fees validation for DE " + de);
                         return validateAdditionalFees(de, expected, actual, result, validation.get("rules"));
+                    case "additional_amounts":
+                        System.out.println("Processing additional_amounts validation for DE " + de);
+                        return validateAdditionalAmounts(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -1876,6 +1879,84 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to validate additional fees: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Validates DE 54 (Additional Amounts) with position-based validation
+     */
+    private static boolean validateAdditionalAmounts(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            JsonNode actualJson = objectMapper.readTree(actual);
+            JsonNode positions = rules.get("positions");
+            boolean allValid = true;
+            StringBuilder validationDetails = new StringBuilder();
+
+            // Get the first additional amount from the array
+            JsonNode additionalAmounts = actualJson.path("transaction").path("additionalAmounts");
+            if (!additionalAmounts.isArray() || additionalAmounts.size() == 0) {
+                result.addFailedField(de, expected, "No additional amounts found in canonical response");
+                return false;
+            }
+            JsonNode amount = additionalAmounts.get(0);
+
+            // Validate Account Type (positions 1-2)
+            String accountType = expected.substring(0, 2);
+            String expectedAccountType = positions.get("accountType").get("mapping").get(accountType).asText();
+            String actualAccountType = amount.path("accountType").asText();
+            boolean accountTypeValid = expectedAccountType.equals(actualAccountType);
+            validationDetails.append(String.format("Account Type: %s->%s (%s), ",
+                    accountType, expectedAccountType, accountTypeValid ? "✓" : "✗"));
+            allValid &= accountTypeValid;
+
+            // Validate Amount Type (positions 3-4)
+            String amountType = expected.substring(2, 4);
+            String expectedAmountType = positions.get("amountType").get("mapping").get(amountType).asText();
+            String actualAmountType = amount.path("amountType").asText();
+            boolean amountTypeValid = expectedAmountType.equals(actualAmountType);
+            validationDetails.append(String.format("Amount Type: %s->%s (%s), ",
+                    amountType, expectedAmountType, amountTypeValid ? "✓" : "✗"));
+            allValid &= amountTypeValid;
+
+            // Validate Currency Code (positions 5-7)
+            String currencyCode = expected.substring(4, 7);
+            String actualCurrencyCode = amount.path("amount").path("currencyCode").asText();
+            boolean currencyCodeValid = currencyCode.equals(actualCurrencyCode);
+            validationDetails.append(String.format("Currency Code: %s (%s), ",
+                    currencyCode, currencyCodeValid ? "✓" : "✗"));
+            allValid &= currencyCodeValid;
+
+            // Validate Amount (positions 8-20)
+            JsonNode amountComponent = positions.get("amount");
+
+            // Validate Debit/Credit Indicator (position 8)
+            String indicator = expected.substring(7, 8);
+            String expectedIndicator = amountComponent.get("components").get("debitCreditIndicator").get("mapping").get(indicator).asText();
+            String actualIndicator = amount.path("amount").path("debitCreditIndicatorType").asText();
+            boolean indicatorValid = expectedIndicator.equals(actualIndicator);
+            validationDetails.append(String.format("D/C Indicator: %s->%s (%s), ",
+                    indicator, expectedIndicator, indicatorValid ? "✓" : "✗"));
+            allValid &= indicatorValid;
+
+            // Validate Amount Value (positions 9-20)
+            String amountStr = expected.substring(8, 20);
+            String normalizedAmount = String.valueOf(Long.parseLong(amountStr)); // Remove leading zeros
+            String actualAmount = amount.path("amount").path("amount").asText();
+            boolean amountValid = normalizedAmount.equals(actualAmount);
+            validationDetails.append(String.format("Amount: %s->%s (%s)",
+                    amountStr, normalizedAmount, amountValid ? "✓" : "✗"));
+            allValid &= amountValid;
+
+            if (allValid) {
+                result.addPassedField(de, expected, validationDetails.toString());
+            } else {
+                result.addFailedField(de, expected, validationDetails.toString());
+            }
+            return allValid;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to validate additional amounts: " + e.getMessage());
             return false;
         }
     }

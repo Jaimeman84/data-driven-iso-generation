@@ -867,6 +867,7 @@
     "name": "Additional Amounts",
     "canonical": [
       "transaction.additionalAmounts[0].accountType",
+      "transaction.additionalAmounts[0].amountType",
       "transaction.additionalAmounts[0].amount.currencyCode",
       "transaction.additionalAmounts[0].amount.debitCreditIndicatorType",
       "transaction.additionalAmounts[0].amount.amount"
@@ -887,6 +888,15 @@
             "end": 2,
             "mapping": {
               "00": "DEFAULT"
+            }
+          },
+          "amountType": {
+            "start": 3,
+            "end": 4,
+            "mapping": {
+              "01": "ORIGINAL_REQUEST_AMOUNT",
+              "02": "ACCOUNT_AVAIALBE_BALANCE",
+              "03": "CASH_BACK_AMOUNT"
             }
           },
           "currencyCode": {
