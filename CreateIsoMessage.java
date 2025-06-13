@@ -106,7 +106,6 @@ public class CreateIsoMessage  {
         }
     }
 
-
     public static void applyBddUpdate(String jsonPath, String value, String dataType) {
         String fieldNumber = getFieldNumberFromJsonPath(jsonPath);
         if (fieldNumber == null) {
@@ -467,57 +466,18 @@ public class CreateIsoMessage  {
                     messageCell.setCellValue(isoMessage);
 
                     try {
-                        // Send message via WebSocket and get response
-                        IsoWebSocketClient wsClient = new IsoWebSocketClient();
-                        String wsResponse = wsClient.sendIsoMessage("ws://your-websocket-url:port/service", isoMessage);
-                        System.out.println("\nWebSocket Response:");
-                        System.out.println(wsResponse);
-
-                        // Send the WebSocket response to the parser
-                        String parsedResponse = sendIsoMessageToParser(wsResponse);
-                        JsonNode responseJson = objectMapper.readTree(parsedResponse);
-
-                        // Create a cell for the response code (Column CN)
-                        Cell responseCell = dataRow.createCell(92); // Column CN
-
-                        // Extract MTI and DE 39 from response
-                        String responseMti = null;
-                        String responseCode = null;
-                        String responseDesc = "";
-
-                        // Find MTI and DE 39 in the parsed response
-                        for (JsonNode element : responseJson) {
-                            if (element.has("dataElementId")) {
-                                String deId = element.get("dataElementId").asText();
-                                if ("MTI".equals(deId)) {
-                                    responseMti = element.get("value").asText();
-                                } else if ("39".equals(deId)) {
-                                    responseCode = element.get("value").asText();
-                                    // You can add a mapping here for response code descriptions
-                                    responseDesc = getResponseCodeDescription(responseCode);
-                                }
-                            }
-                        }
-
-                        // Validate MTI (0100 -> 0110, etc.)
-                        String expectedResponseMti = getExpectedResponseMti(isoFields.get(0));
-                        boolean mtiValid = expectedResponseMti.equals(responseMti);
-
-                        // Format the response information
-                        StringBuilder responseInfo = new StringBuilder();
-                        responseInfo.append("MTI: ").append(responseMti)
-                                  .append(mtiValid ? " (✓)" : " (✗)");
+                        // Process the ISO message using the new processor
+                        IsoMessageProcessor processor = new IsoMessageProcessor(
+                            "ws://your-websocket-url:port/service",  // Replace with actual WebSocket URL
+                            PARSER_URL
+                        );
                         
-                        if (responseCode != null) {
-                            responseInfo.append(", DE 39: ").append(responseCode);
-                            if (!responseDesc.isEmpty()) {
-                                responseInfo.append(" (").append(responseDesc).append(")");
-                            }
-                        } else {
-                            responseInfo.append(", DE 39: Not found in response");
-                        }
+                        IsoMessageProcessor.ProcessedIsoResponse response = 
+                            processor.processIsoMessage(isoMessage, isoFields.get(0));
 
-                        responseCell.setCellValue(responseInfo.toString());
+                        // Create a cell for the response (Column CN)
+                        Cell responseCell = dataRow.createCell(92); // Column CN
+                        responseCell.setCellValue(response.getFormattedResponse());
 
                     } catch (Exception e) {
                         System.out.println("\nWebSocket/Parser Error: " + e.getMessage());
