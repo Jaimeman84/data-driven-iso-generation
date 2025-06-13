@@ -1249,8 +1249,26 @@ public class CreateIsoMessage  {
                     "DE", "Status", "ISO Value", "Canonical Value", "Mapping"));
             System.out.println("-".repeat(120));
 
-            // Sort the results by DE number for consistent display
-            new TreeMap<>(results).forEach((de, result) -> {
+            // Create a sorted map with custom comparator for numeric DE sorting
+            Map<String, FieldResult> sortedResults = new TreeMap<>((de1, de2) -> {
+                // Handle MTI specially
+                if (de1.equals("MTI")) return -1;
+                if (de2.equals("MTI")) return 1;
+                
+                // Convert DEs to integers for numeric comparison
+                try {
+                    int num1 = Integer.parseInt(de1);
+                    int num2 = Integer.parseInt(de2);
+                    return Integer.compare(num1, num2);
+                } catch (NumberFormatException e) {
+                    // Fallback to string comparison if parsing fails
+                    return de1.compareTo(de2);
+                }
+            });
+            sortedResults.putAll(results);
+
+            // Print the sorted results
+            sortedResults.forEach((de, result) -> {
                 try {
                     JsonNode config = fieldConfig.get(de);
                     List<String> paths = new ArrayList<>();
