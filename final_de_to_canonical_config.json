@@ -692,7 +692,7 @@
       "transaction.fees.additionalFees.fee.amount.amount",
       "transaction.fees.additionalFees.fee.amount.debitCreditIndicatorType",
       "transaction.fees.additionalFees.settlement.settlementAmount.amount",
-      "transaction.fees.additionalFees.settlement.settlementAmount. debitCreditIndicatorType"
+      "transaction.fees.additionalFees.settlement.settlementAmount.debitCreditIndicatorType"
     ],
     "format": "lllvar",
     "type": "alphanumeric",
@@ -700,7 +700,82 @@
     "notes": "Not expected for MVP. Pass to auth engine if received.",
     "max_length": 88,
     "active": false,
-    "SampleData": "013ABC1235MAX088"
+    "SampleData": "013ABC1235MAX088",
+    "validation": {
+      "type": "additional_fees",
+      "rules": {
+        "positions": {
+          "feeType": {
+            "start": 1,
+            "end": 2,
+            "mapping": {
+              "00": "TRANSACTION_FEE_TYPE_DEFAULT",
+              "01": "TRANSACTION_FEE",
+              "02": "MASTERCARD_CURRENCY_CONVERSION_ASSESSMENT",
+              "03": "OPTIONAL_ISSUER_FEE",
+              "04": "FOREIGN_EXCHANGE_FEE",
+              "05": "OVERDRAFT_FEE",
+              "06": "ADDITIONAL_TRANSACTION_FEE_1",
+              "07": "ADDITIONAL_TRANSACTION_FEE_2"
+            }
+          },
+          "settleMemoIndicator": {
+            "position": 3,
+            "mapping": {
+              "0": "SETTLEMENT_MEMO_INDICATOR_DEFAULT",
+              "1": "TRANSACTION_FEE_EXCLUDED",
+              "2": "SURCHARGE_FEE_INCLUDED"
+            }
+          },
+          "decimalizationIndicator": {
+            "position": 4,
+            "mapping": {
+              "0": "0"
+            }
+          },
+          "feeAmount": {
+            "start": 5,
+            "end": 13,
+            "components": {
+              "debitCreditIndicator": {
+                "position": 5,
+                "mapping": {
+                  "C": "CREDIT_AMOUNT",
+                  "D": "DEBIT_AMOUNT"
+                }
+              },
+              "amount": {
+                "start": 6,
+                "end": 13,
+                "type": "numeric",
+                "maxValue": 99999999,
+                "removeLeadingZeros": true
+              }
+            }
+          },
+          "settlementAmount": {
+            "start": 14,
+            "end": 22,
+            "components": {
+              "debitCreditIndicator": {
+                "position": 14,
+                "mapping": {
+                  "C": "CREDIT_AMOUNT",
+                  "D": "DEBIT_AMOUNT"
+                }
+              },
+              "amount": {
+                "start": 15,
+                "end": 22,
+                "type": "numeric",
+                "maxValue": 99999999,
+                "removeLeadingZeros": true
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "47": {
     "name": "Additional Data National",

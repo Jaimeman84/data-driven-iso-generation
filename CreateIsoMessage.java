@@ -531,8 +531,8 @@ public class CreateIsoMessage  {
                 Arrays.fill(secondaryBitmap, false);
 
                 int processedFields = 0;
-                // Start from Column B (index 1) and go to Column CD (index 81)
-                for (int colNum = 1; colNum <= 81; colNum++) {
+                // Start from Column B (index 1) and go to Column CJ (index 87)
+                for (int colNum = 1; colNum <= 87; colNum++) {
                     // Get the Data Element Key from Row 1
                     Cell headerCell = headerRow.getCell(colNum);
                     String dataElementKey = getCellValueAsString(headerCell).trim();
@@ -827,6 +827,8 @@ public class CreateIsoMessage  {
                         return validateOriginalData(de, expected, actual, result, validation.get("rules"));
                     case "pos_condition_code":
                         return validatePosConditionCode(de, expected, actual, result, validation.get("rules"));
+                    case "additional_fees":
+                        return validateAdditionalFees(de, expected, actual, result, validation.get("rules"));
                 }
             }
         }
@@ -913,7 +915,7 @@ public class CreateIsoMessage  {
 
             // Check if this field is part of a paired datetime
             if (format.has("pairedField")) {
-                JsonNode paired = format.get("pairedField");
+                JsonNode paired = format.get("format").get("pairedField");
                 String otherField = paired.get("field").asText();
                 String fieldType = paired.get("type").asText();
                 
@@ -1137,7 +1139,8 @@ public class CreateIsoMessage  {
         Map<String, String> deValues = new HashMap<>();
         Row headerRow = row.getSheet().getRow(0);
         
-        for (int colNum = 1; colNum <= 81; colNum++) {
+        // Start from Column B (index 1) and go to Column CJ (index 87)
+        for (int colNum = 1; colNum <= 87; colNum++) {
             Cell headerCell = headerRow.getCell(colNum);
             Cell dataCell = row.getCell(colNum);
             
@@ -1740,6 +1743,100 @@ public class CreateIsoMessage  {
         } catch (Exception e) {
             allValid = false;
             details.append(String.format("%s: Error (%s), ", componentName, e.getMessage()));
+        }
+    }
+
+    /**
+     * Validates DE 46 (Additional Fees) with position-based validation
+     */
+    private static boolean validateAdditionalFees(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            JsonNode actualJson = objectMapper.readTree(actual);
+            JsonNode positions = rules.get("positions");
+            boolean allValid = true;
+            StringBuilder validationDetails = new StringBuilder();
+
+            // Validate Fee Type (positions 1-2)
+            String feeType = expected.substring(0, 2);
+            String expectedFeeType = positions.get("feeType").get("mapping").get(feeType).asText();
+            String actualFeeType = getJsonValue(actualJson, "transaction.fees.additionalFees.feeType");
+            boolean feeTypeValid = expectedFeeType.equals(actualFeeType);
+            validationDetails.append(String.format("Fee Type: %s->%s (%s), ", 
+                feeType, expectedFeeType, feeTypeValid ? "✓" : "✗"));
+            allValid &= feeTypeValid;
+
+            // Validate Settlement Memo Indicator (position 3)
+            String settleMemo = expected.substring(2, 3);
+            String expectedSettleMemo = positions.get("settleMemoIndicator").get("mapping").get(settleMemo).asText();
+            String actualSettleMemo = getJsonValue(actualJson, "transaction.fees.additionalFees.settleMemoIndicator");
+            boolean settleMemoValid = expectedSettleMemo.equals(actualSettleMemo);
+            validationDetails.append(String.format("Settle Memo: %s->%s (%s), ", 
+                settleMemo, expectedSettleMemo, settleMemoValid ? "✓" : "✗"));
+            allValid &= settleMemoValid;
+
+            // Validate Decimalization Indicator (position 4)
+            String decimalization = expected.substring(3, 4);
+            String expectedDecimalization = positions.get("decimalizationIndicator").get("mapping").get(decimalization).asText();
+            String actualDecimalization = getJsonValue(actualJson, "transaction.fees.additionalFees.decimalizationIndicator");
+            boolean decimalizationValid = expectedDecimalization.equals(actualDecimalization);
+            validationDetails.append(String.format("Decimalization: %s (%s), ", 
+                decimalization, decimalizationValid ? "✓" : "✗"));
+            allValid &= decimalizationValid;
+
+            // Validate Fee Amount (positions 5-13)
+            JsonNode feeAmount = positions.get("feeAmount");
+            String feeAmountValue = expected.substring(4, 13);
+            
+            // Validate Debit/Credit Indicator (position 5)
+            String feeIndicator = feeAmountValue.substring(0, 1);
+            String expectedFeeIndicator = feeAmount.get("components").get("debitCreditIndicator").get("mapping").get(feeIndicator).asText();
+            String actualFeeIndicator = getJsonValue(actualJson, "transaction.fees.additionalFees.fee.amount.debitCreditIndicatorType");
+            boolean feeIndicatorValid = expectedFeeIndicator.equals(actualFeeIndicator);
+            validationDetails.append(String.format("Fee Indicator: %s->%s (%s), ", 
+                feeIndicator, expectedFeeIndicator, feeIndicatorValid ? "✓" : "✗"));
+            allValid &= feeIndicatorValid;
+
+            // Validate Fee Amount (positions 6-13)
+            String feeAmountStr = feeAmountValue.substring(1);
+            String normalizedFeeAmount = String.valueOf(Long.parseLong(feeAmountStr)); // Remove leading zeros
+            String actualFeeAmount = getJsonValue(actualJson, "transaction.fees.additionalFees.fee.amount.amount");
+            boolean feeAmountValid = normalizedFeeAmount.equals(actualFeeAmount);
+            validationDetails.append(String.format("Fee Amount: %s->%s (%s), ", 
+                feeAmountStr, normalizedFeeAmount, feeAmountValid ? "✓" : "✗"));
+            allValid &= feeAmountValid;
+
+            // Validate Settlement Amount (positions 14-22)
+            JsonNode settlementAmount = positions.get("settlementAmount");
+            String settlementValue = expected.substring(13, 22);
+            
+            // Validate Settlement Debit/Credit Indicator (position 14)
+            String settlementIndicator = settlementValue.substring(0, 1);
+            String expectedSettlementIndicator = settlementAmount.get("components").get("debitCreditIndicator").get("mapping").get(settlementIndicator).asText();
+            String actualSettlementIndicator = getJsonValue(actualJson, "transaction.fees.additionalFees.settlement.settlementAmount.debitCreditIndicatorType");
+            boolean settlementIndicatorValid = expectedSettlementIndicator.equals(actualSettlementIndicator);
+            validationDetails.append(String.format("Settlement Indicator: %s->%s (%s), ", 
+                settlementIndicator, expectedSettlementIndicator, settlementIndicatorValid ? "✓" : "✗"));
+            allValid &= settlementIndicatorValid;
+
+            // Validate Settlement Amount (positions 15-22)
+            String settlementAmountStr = settlementValue.substring(1);
+            String normalizedSettlementAmount = String.valueOf(Long.parseLong(settlementAmountStr)); // Remove leading zeros
+            String actualSettlementAmount = getJsonValue(actualJson, "transaction.fees.additionalFees.settlement.settlementAmount.amount");
+            boolean settlementAmountValid = normalizedSettlementAmount.equals(actualSettlementAmount);
+            validationDetails.append(String.format("Settlement Amount: %s->%s (%s)", 
+                settlementAmountStr, normalizedSettlementAmount, settlementAmountValid ? "✓" : "✗"));
+            allValid &= settlementAmountValid;
+
+            if (allValid) {
+                result.addPassedField(de, expected, validationDetails.toString());
+            } else {
+                result.addFailedField(de, expected, validationDetails.toString());
+            }
+            return allValid;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to validate additional fees: " + e.getMessage());
+            return false;
         }
     }
 
