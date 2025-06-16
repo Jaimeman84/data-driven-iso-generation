@@ -866,6 +866,9 @@ public class CreateIsoMessage  {
                     case "issuer_trace_data":
                         System.out.println("Processing issuer trace data validation for DE " + de);
                         return validateIssuerTraceData(de, expected, actual, result, validation.get("rules"));
+                    case "incremental_auth_data":
+                        System.out.println("Processing incremental authorization data validation for DE " + de);
+                        return validateIncrementalAuthData(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -883,6 +886,68 @@ public class CreateIsoMessage  {
         }
         result.addFailedField(de, expected, actual);
         return false;
+    }
+
+    private static boolean validateIncrementalAuthData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            if (expected == null || actual == null || expected.length() != 12) {
+                result.addFailedField(de, expected, "Invalid incremental authorization data length");
+                return true;
+            }
+
+            JsonNode actualJson = objectMapper.readTree(actual);
+            StringBuilder details = new StringBuilder();
+            boolean allValid = true;
+
+            // Parse TLV data from expected string
+            Map<String, String> expectedValues = new HashMap<>();
+            int position = 0;
+            while (position < expected.length()) {
+                String tag = expected.substring(position, position + 2);
+                String length = expected.substring(position + 2, position + 4);
+                String value = expected.substring(position + 4, position + 4 + Integer.parseInt(length));
+                expectedValues.put(tag, value);
+                position += 4 + Integer.parseInt(length);
+            }
+
+            // Validate count (CN tag)
+            String expectedCount = expectedValues.get("CN");
+            String actualCount = getJsonValue(actualJson, "transaction.incrementalAuthorization.count");
+            if (!expectedCount.equals(actualCount)) {
+                details.append("Count mismatch: expected ").append(expectedCount)
+                      .append(", got ").append(actualCount).append("; ");
+                allValid = false;
+            }
+
+            // Validate sequence (SN tag)
+            String expectedSequence = expectedValues.get("SN");
+            String actualSequence = getJsonValue(actualJson, "transaction.incrementalAuthorization.sequence");
+            if (!expectedSequence.equals(actualSequence)) {
+                details.append("Sequence mismatch: expected ").append(expectedSequence)
+                      .append(", got ").append(actualSequence).append("; ");
+                allValid = false;
+            }
+
+            // Validate authorization type (always MULTIPLE_COMPLETION)
+            String actualAuthType = getJsonValue(actualJson, "transaction.incrementalAuthorization.incrementalAuthorizationType");
+            String expectedAuthType = "MULTIPLE_COMPLETION";
+            if (!expectedAuthType.equals(actualAuthType)) {
+                details.append("Authorization type mismatch: expected ").append(expectedAuthType)
+                      .append(", got ").append(actualAuthType);
+                allValid = false;
+            }
+
+            if (allValid) {
+                result.addPassedField(de, expected, actual);
+            } else {
+                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+            }
+
+            return true;
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to parse incremental authorization data: " + e.getMessage());
+            return false;
+        }
     }
 
     private static boolean validateNetworkData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
@@ -2671,6 +2736,4 @@ public class CreateIsoMessage  {
             row.createCell(6).setCellValue(details.toString());
         }
     }
-
-
 }

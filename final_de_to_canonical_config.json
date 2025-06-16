@@ -1474,16 +1474,40 @@
   "124": {
     "name": "Tag Data Acquirer",
     "canonical": [
-      "Tag : SN --> Transaction.IncrementalAuthorization.sequence",
-      "Tag : CN --> Transaction.IncrementalAuthorization.count"
+      "transaction.incrementalAuthorization.incrementalAuthorizationType",
+      "transaction.incrementalAuthorization.sequence",
+      "transaction.incrementalAuthorization.count"
     ],
-    "format": "lllvar",
+    "format": "fixed",
     "type": "alphanumeric",
-    "length": null,
-    "notes": "Sent if tagged data is available in tag-length-value (TLV) format.",
-    "max_length": 255,
+    "length": 12,
+    "notes": "Contains incremental authorization data in TLV format. CN tag represents count, SN tag represents sequence number.",
     "active": false,
-    "SampleData": "026TDA11111111111111111MAX255"
+    "SampleData": "CN0201SN0201",
+    "validation": {
+      "type": "incremental_auth_data",
+      "rules": {
+        "tags": {
+          "CN": {
+            "name": "count",
+            "path": "transaction.incrementalAuthorization.count",
+            "lengthBytes": 2,
+            "valueType": "numeric"
+          },
+          "SN": {
+            "name": "sequence",
+            "path": "transaction.incrementalAuthorization.sequence",
+            "lengthBytes": 2,
+            "valueType": "numeric"
+          }
+        },
+        "authorizationType": {
+          "mapping": {
+            "default": "MULTIPLE_COMPLETION"
+          }
+        }
+      }
+    }
   },
   "126": {
     "name": "Issuer Trace Data",
