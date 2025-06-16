@@ -1497,13 +1497,67 @@
       "transaction.issuerTraceData.merchantType",
       "transaction.issuerTraceData.traceId"
     ],
-    "format": "lllvar",
+    "format": "fixed",
     "type": "alphanumeric",
-    "length": null,
-    "notes": "Optional for Mastercard Networks Exchange ISO acquirers.",
-    "max_length": 100,
+    "length": 52,
+    "notes": "Contains issuer trace data for dual message authorization format. Format code 6 indicates DUAL_MESSAGE_AUTH_FORMAT_CODE. BanknetReferenceNumber length varies based on merchantType presence.",
     "active": false,
-    "SampleData": "026TDI11111111111111111MAX100"
+    "SampleData": "600013705161921220531MPX8523690000000AXD123456789123",
+    "validation": {
+      "type": "issuer_trace_data",
+      "rules": {
+        "positions": {
+          "formatCode": {
+            "position": 1,
+            "mapping": {
+              "6": "DUAL_MESSAGE_AUTH_FORMAT_CODE"
+            }
+          },
+          "systemTraceAuditNumber": {
+            "start": 2,
+            "end": 7,
+            "length": 6
+          },
+          "transmissionDateTime": {
+            "start": 8,
+            "end": 17,
+            "length": 10,
+            "format": "MMDDhhmmss"
+          },
+          "settlementDate": {
+            "start": 18,
+            "end": 21,
+            "length": 4,
+            "format": "MMDD"
+          },
+          "financialNetworkCode": {
+            "start": 22,
+            "end": 24,
+            "length": 3
+          },
+          "banknetReferenceNumber": {
+            "start": 25,
+            "end": 33,
+            "length": "dynamic",
+            "minLength": 6,
+            "maxLength": 9,
+            "notes": "Length is 9 if merchantType is present, 6 otherwise"
+          },
+          "merchantType": {
+            "start": 34,
+            "end": 37,
+            "length": 4,
+            "optional": true,
+            "notes": "Present only if banknetReferenceNumber is 9 characters"
+          },
+          "traceId": {
+            "start": 38,
+            "end": 52,
+            "length": 15
+          }
+        }
+      }
+    }
   },
   "127": {
     "name": "Acquirer Trace Data",
