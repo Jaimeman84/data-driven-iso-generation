@@ -1438,17 +1438,36 @@
   "123": {
     "name": "Additional Data",
     "canonical": [
-      "AVS Data :",
-      "Tag : AV -> Transaction.member.address.zipCode",
-      "Tag: CV -> Passed to Card Auth : CVV2 (not canonicalized)"
+      "transaction.member.address.zipCode"
     ],
     "format": "lllvar",
     "type": "alphanumeric",
     "length": null,
-    "notes": "Required to support the Address Verification Service (AVS) and other types of verification data.",
+    "notes": "Contains AVS data with dynamic zip code length. Format: TDAV[length:2][zipcode:length]. Example: TDAV0510001 where 05 is length and 10001 is zipcode.",
     "max_length": 50,
     "active": false,
-    "SampleData": "026TDA11111111111111111MAX050"
+    "SampleData": "TDAV0510001CV0711055 P",
+    "validation": {
+      "type": "avs_data",
+      "rules": {
+        "positions": {
+          "prefix": {
+            "start": 1,
+            "end": 4,
+            "expected": "TDAV"
+          },
+          "zipCodeLength": {
+            "start": 5,
+            "end": 6,
+            "type": "numeric"
+          },
+          "zipCode": {
+            "dynamicStart": 7,
+            "dynamicLength": "zipCodeLength"
+          }
+        }
+      }
+    }
   },
   "124": {
     "name": "Tag Data Acquirer",

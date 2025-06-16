@@ -857,6 +857,9 @@ public class CreateIsoMessage  {
                     case "network_data":
                         System.out.println("Processing network_data validation for DE " + de);
                         return validateNetworkData(de, expected, actual, result, validation.get("rules"));
+                    case "avs_data":
+                        System.out.println("Processing AVS data validation for DE " + de);
+                        return validateAvsData(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -2291,6 +2294,58 @@ public class CreateIsoMessage  {
                 details.append("Skipped: ").append(canonicalValue);
             }
             row.createCell(6).setCellValue(details.toString());
+        }
+    }
+
+    private static boolean validateAvsData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            if (expected == null || actual == null) {
+                result.addFailedField(de, expected, actual);
+                return true;
+            }
+
+            JsonNode actualJson = objectMapper.readTree(actual);
+            StringBuilder details = new StringBuilder();
+            boolean allValid = true;
+
+            // Validate prefix (should be "TDAV")
+            String prefix = expected.substring(0, 4);
+            if (!"TDAV".equals(prefix)) {
+                details.append("Invalid prefix: expected TDAV, got ").append(prefix).append("; ");
+                allValid = false;
+            }
+
+            // Extract and validate zip code length
+            String zipLengthStr = expected.substring(4, 6);
+            int zipLength;
+            try {
+                zipLength = Integer.parseInt(zipLengthStr);
+            } catch (NumberFormatException e) {
+                details.append("Invalid zip code length format: ").append(zipLengthStr).append("; ");
+                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                return true;
+            }
+
+            // Extract and validate zip code
+            String expectedZipCode = expected.substring(6, 6 + zipLength);
+            String actualZipCode = getJsonValue(actualJson, "transaction.member.address.zipCode");
+            
+            if (!expectedZipCode.equals(actualZipCode)) {
+                details.append("Zip code mismatch: expected ").append(expectedZipCode)
+                      .append(", got ").append(actualZipCode);
+                allValid = false;
+            }
+
+            if (allValid) {
+                result.addPassedField(de, expected, actual);
+            } else {
+                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+            }
+
+            return true;
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to parse AVS data: " + e.getMessage());
+            return false;
         }
     }
 }
