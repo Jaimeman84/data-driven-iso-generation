@@ -1221,22 +1221,54 @@
     "name": "Mastercard Networks Exchange Data",
     "canonical": [
       "transaction.Network.pseudoTerminal",
-      "transaction.Network.issuerId",
       "transaction.Network.acquirerNetworkId",
       "transaction.Network.processorId",
       "transaction.Network.ProcessingFlag.isExternallySettled",
-      "transaction.Network.ProcessingFlag.isSplitTransaction",
-      "transaction.Network.ProcessingFlag.partialAuthTerminalSupportIndicator",
-      "transaction.Network.ProcessingFlag.acquirerOverdraftFlag",
-      "transaction.Network.ProcessingFlag.issuerOverdraftFlag"
+      "transaction.Network.ProcessingFlag.partialAuthTerminalSupportIndicator"
     ],
-    "format": "lllvar",
+    "format": "fixed",
     "type": "alphanumeric",
-    "length": null,
-    "notes": "Used for least cost routing. Ignore for MVP.",
-    "max_length": 50,
+    "length": 22,
+    "notes": "Contains network processing data including terminal, network, and processor IDs along with processing flags.",
     "active": false,
-    "SampleData": "020ABC12345678910MAX050"
+    "SampleData": "B2PT0012MC1PRC001Y 1  ",
+    "validation": {
+      "type": "network_data",
+      "rules": {
+        "positions": {
+          "pseudoTerminal": {
+            "start": 3,
+            "end": 8
+          },
+          "acquirerNetworkId": {
+            "start": 9,
+            "end": 10
+          },
+          "processorId": {
+            "start": 12,
+            "end": 17
+          },
+          "processingFlags": {
+            "isExternallySettled": {
+              "position": 18,
+              "mapping": {
+                "Y": "SETTLED_BETWEEN_ACQUIRER_AND_ISSUER",
+                " ": "SETTLED_THROUGH_NETWORK_EXCHANGE"
+              }
+            },
+            "partialAuthTerminalSupportIndicator": {
+              "position": 20,
+              "mapping": {
+                "1": "TERMINAL_SUPPPORT_PARTIAL_APPROVAL",
+                "0": "TERMINAL_DOES_NOT_SUPPPORT_PARTIAL_APPROVAL",
+                " ": "TERMINAL_DOES_NOT_SUPPPORT_PARTIAL_APPROVAL",
+                "2": "RETURNS_BALANCES_IN_RESPONSE"
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "67": {
     "name": "Extended Payment Code",

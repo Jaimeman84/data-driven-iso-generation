@@ -854,6 +854,9 @@ public class CreateIsoMessage  {
                     case "national_pos_geographic_data":
                         System.out.println("Processing national_pos_geographic_data validation for DE " + de);
                         return validateNationalPosGeographicData(de, expected, actual, result, validation.get("rules"));
+                    case "network_data":
+                        System.out.println("Processing network_data validation for DE " + de);
+                        return validateNetworkData(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -871,6 +874,87 @@ public class CreateIsoMessage  {
         }
         result.addFailedField(de, expected, actual);
         return false;
+    }
+
+    private static boolean validateNetworkData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            if (expected == null || actual == null) {
+                result.addFailedField(de, expected, actual);
+                return true;
+            }
+
+            JsonNode actualJson = objectMapper.readTree(actual);
+            StringBuilder details = new StringBuilder();
+            boolean allValid = true;
+
+            // Validate pseudoTerminal
+            String expectedPseudoTerminal = expected.substring(2, 8);
+            String actualPseudoTerminal = getJsonValue(actualJson, "transaction.Network.pseudoTerminal");
+            if (!expectedPseudoTerminal.equals(actualPseudoTerminal)) {
+                details.append("Pseudo Terminal mismatch: expected ").append(expectedPseudoTerminal)
+                      .append(", got ").append(actualPseudoTerminal).append("; ");
+                allValid = false;
+            }
+
+            // Validate acquirerNetworkId
+            String expectedNetworkId = expected.substring(8, 10);
+            String actualNetworkId = getJsonValue(actualJson, "transaction.Network.acquirerNetworkId");
+            if (!expectedNetworkId.equals(actualNetworkId)) {
+                details.append("Acquirer Network ID mismatch: expected ").append(expectedNetworkId)
+                      .append(", got ").append(actualNetworkId).append("; ");
+                allValid = false;
+            }
+
+            // Validate processorId
+            String expectedProcessorId = expected.substring(11, 17);
+            String actualProcessorId = getJsonValue(actualJson, "transaction.Network.processorId");
+            if (!expectedProcessorId.equals(actualProcessorId)) {
+                details.append("Processor ID mismatch: expected ").append(expectedProcessorId)
+                      .append(", got ").append(actualProcessorId).append("; ");
+                allValid = false;
+            }
+
+            // Validate isExternallySettled flag
+            char externallySettledFlag = expected.charAt(17);
+            String expectedSettlement = externallySettledFlag == 'Y' ? "SETTLED_BETWEEN_ACQUIRER_AND_ISSUER" : "SETTLED_THROUGH_NETWORK_EXCHANGE";
+            String actualSettlement = getJsonValue(actualJson, "transaction.Network.ProcessingFlag.isExternallySettled");
+            if (!expectedSettlement.equals(actualSettlement)) {
+                details.append("Settlement flag mismatch: expected ").append(expectedSettlement)
+                      .append(", got ").append(actualSettlement).append("; ");
+                allValid = false;
+            }
+
+            // Validate partialAuthTerminalSupportIndicator
+            char partialAuthFlag = expected.charAt(19);
+            String expectedPartialAuth;
+            switch (partialAuthFlag) {
+                case '1':
+                    expectedPartialAuth = "TERMINAL_SUPPPORT_PARTIAL_APPROVAL";
+                    break;
+                case '2':
+                    expectedPartialAuth = "RETURNS_BALANCES_IN_RESPONSE";
+                    break;
+                default:
+                    expectedPartialAuth = "TERMINAL_DOES_NOT_SUPPPORT_PARTIAL_APPROVAL";
+            }
+            String actualPartialAuth = getJsonValue(actualJson, "transaction.Network.ProcessingFlag.partialAuthTerminalSupportIndicator");
+            if (!expectedPartialAuth.equals(actualPartialAuth)) {
+                details.append("Partial Auth Support mismatch: expected ").append(expectedPartialAuth)
+                      .append(", got ").append(actualPartialAuth);
+                allValid = false;
+            }
+
+            if (allValid) {
+                result.addPassedField(de, expected, actual);
+            } else {
+                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+            }
+
+            return true;
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to parse network data: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
