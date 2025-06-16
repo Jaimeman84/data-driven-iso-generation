@@ -860,6 +860,9 @@ public class CreateIsoMessage  {
                     case "avs_data":
                         System.out.println("Processing AVS data validation for DE " + de);
                         return validateAvsData(de, expected, actual, result, validation.get("rules"));
+                    case "acquirer_trace_data":
+                        System.out.println("Processing acquirer trace data validation for DE " + de);
+                        return validateAcquirerTraceData(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -2346,6 +2349,216 @@ public class CreateIsoMessage  {
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to parse AVS data: " + e.getMessage());
             return false;
+        }
+    }
+
+    private static boolean validateAcquirerTraceData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            if (expected == null || actual == null || expected.length() < 93) {
+                result.addFailedField(de, expected, "Invalid acquirer trace data length");
+                return true;
+            }
+
+            JsonNode actualJson = objectMapper.readTree(actual);
+            StringBuilder details = new StringBuilder();
+            boolean allValid = true;
+
+            // Validate format code
+            String formatCode = expected.substring(0, 1);
+            String expectedFormatCode = "DUAL_MESSAGE_CLEARING_FORMAT_CODE";
+            String actualFormatCode = getJsonValue(actualJson, "transaction.acquirerTraceData.formatCode");
+            if (!expectedFormatCode.equals(actualFormatCode)) {
+                details.append("Format code mismatch: expected ").append(expectedFormatCode)
+                      .append(", got ").append(actualFormatCode).append("; ");
+                allValid = false;
+            }
+
+            // Validate acquirer reference number object
+            validateAcquirerReferenceNumber(expected, actualJson, details);
+
+            // Validate terminal type
+            String terminalType = expected.substring(24, 27);
+            String actualTerminalType = getJsonValue(actualJson, "transaction.acquirerTraceData.terminalType");
+            if (!terminalType.equals(actualTerminalType)) {
+                details.append("Terminal type mismatch: expected ").append(terminalType)
+                      .append(", got ").append(actualTerminalType).append("; ");
+                allValid = false;
+            }
+
+            // Validate acquirer institution ID
+            String acquirerId = expected.substring(27, 38);
+            String actualAcquirerId = getJsonValue(actualJson, "transaction.acquirerTraceData.acquirerInstituionId");
+            if (!acquirerId.equals(actualAcquirerId)) {
+                details.append("Acquirer ID mismatch: expected ").append(acquirerId)
+                      .append(", got ").append(actualAcquirerId).append("; ");
+                allValid = false;
+            }
+
+            // Validate transaction lifecycle
+            validateTransactionLifeCycle(expected, actualJson, details);
+
+            // Validate business activity
+            validateBusinessActivity(expected, actualJson, details);
+
+            // Validate settlement indicator
+            String settlementInd = expected.substring(64, 65);
+            String actualSettlementInd = getJsonValue(actualJson, "transaction.acquirerTraceData.settlementIndicator");
+            if (!settlementInd.equals(actualSettlementInd)) {
+                details.append("Settlement indicator mismatch: expected ").append(settlementInd)
+                      .append(", got ").append(actualSettlementInd).append("; ");
+                allValid = false;
+            }
+
+            // Validate interchange rate designator
+            String interchangeRate = expected.substring(65, 67);
+            String actualInterchangeRate = getJsonValue(actualJson, "transaction.acquirerTraceData.interchangeRateDesignator");
+            if (!interchangeRate.equals(actualInterchangeRate)) {
+                details.append("Interchange rate mismatch: expected ").append(interchangeRate)
+                      .append(", got ").append(actualInterchangeRate).append("; ");
+                allValid = false;
+            }
+
+            // Validate dates
+            validateDate("businessDate", expected.substring(67, 73), actualJson, "transaction.acquirerTraceData.businessDate", details);
+            validateDate("settlementDate", expected.substring(78, 84), actualJson, "transaction.acquirerTraceData.settlementDate", details);
+            validateDate("currencyConversionDate", expected.substring(86, 92), actualJson, "transaction.acquirerTraceData.currencyConversionDate", details);
+
+            // Validate other fields
+            validateSimpleField("productIdentifier", expected.substring(73, 76), actualJson, "transaction.acquirerTraceData.productIdentifier", details);
+            validateSimpleField("businessCycle", expected.substring(76, 78), actualJson, "transaction.acquirerTraceData.businessCycle", details);
+            validateSimpleField("mastercardRateIndicator", expected.substring(84, 85), actualJson, "transaction.acquirerTraceData.mastercardRateIndicator", details);
+
+            // Validate settlement service level code with mapping
+            String settlementServiceLevel = expected.substring(85, 86);
+            String expectedServiceLevel = settlementServiceLevel.equals("1") ? "Regional" : 
+                                       settlementServiceLevel.equals("3") ? "Intracurrency" : settlementServiceLevel;
+            String actualServiceLevel = getJsonValue(actualJson, "transaction.acquirerTraceData.settlementServiceLevelCode");
+            if (!expectedServiceLevel.equals(actualServiceLevel)) {
+                details.append("Settlement service level mismatch: expected ").append(expectedServiceLevel)
+                      .append(", got ").append(actualServiceLevel).append("; ");
+                allValid = false;
+            }
+
+            // Validate currency conversion indicator with mapping
+            String conversionInd = expected.substring(92, 93);
+            String expectedConversionInd = mapCurrencyConversionIndicator(conversionInd);
+            String actualConversionInd = getJsonValue(actualJson, "transaction.acquirerTraceData.currencyConversionIndicator");
+            if (!expectedConversionInd.equals(actualConversionInd)) {
+                details.append("Currency conversion indicator mismatch: expected ").append(expectedConversionInd)
+                      .append(", got ").append(actualConversionInd);
+                allValid = false;
+            }
+
+            if (allValid) {
+                result.addPassedField(de, expected, actual);
+            } else {
+                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+            }
+
+            return true;
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to parse acquirer trace data: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static void validateAcquirerReferenceNumber(String expected, JsonNode actualJson, StringBuilder details) {
+        String mixedUse = expected.substring(1, 2);
+        String refId = expected.substring(2, 8);
+        String julianDate = expected.substring(8, 12);
+        String sequence = expected.substring(12, 23);
+        String checkDigit = expected.substring(23, 24);
+
+        String actualMixedUse = getJsonValue(actualJson, "transaction.acquirerTraceData.acquirerReferenceNumberObject.mixedUse");
+        String actualRefId = getJsonValue(actualJson, "transaction.acquirerTraceData.acquirerReferenceNumberObject.acquirerReferenceId");
+        String actualJulianDate = getJsonValue(actualJson, "transaction.acquirerTraceData.acquirerReferenceNumberObject.julianDate");
+        String actualSequence = getJsonValue(actualJson, "transaction.acquirerTraceData.acquirerReferenceNumberObject.acquirerSequence");
+        String actualCheckDigit = getJsonValue(actualJson, "transaction.acquirerTraceData.acquirerReferenceNumberObject.checkDigit");
+
+        if (!mixedUse.equals(actualMixedUse)) {
+            details.append("Mixed use mismatch: expected ").append(mixedUse)
+                  .append(", got ").append(actualMixedUse).append("; ");
+        }
+        if (!refId.equals(actualRefId)) {
+            details.append("Reference ID mismatch: expected ").append(refId)
+                  .append(", got ").append(actualRefId).append("; ");
+        }
+        if (!julianDate.equals(actualJulianDate)) {
+            details.append("Julian date mismatch: expected ").append(julianDate)
+                  .append(", got ").append(actualJulianDate).append("; ");
+        }
+        if (!sequence.equals(actualSequence)) {
+            details.append("Sequence mismatch: expected ").append(sequence)
+                  .append(", got ").append(actualSequence).append("; ");
+        }
+        if (!checkDigit.equals(actualCheckDigit)) {
+            details.append("Check digit mismatch: expected ").append(checkDigit)
+                  .append(", got ").append(actualCheckDigit).append("; ");
+        }
+    }
+
+    private static void validateTransactionLifeCycle(String expected, JsonNode actualJson, StringBuilder details) {
+        String indicator = expected.substring(38, 39);
+        String traceId = expected.substring(39, 54);
+
+        String actualIndicator = getJsonValue(actualJson, "transaction.acquirerTraceData.transactionLifeCycle.lifeCycleSupportIndicator");
+        String actualTraceId = getJsonValue(actualJson, "transaction.acquirerTraceData.transactionLifeCycle.traceId");
+
+        if (!indicator.equals(actualIndicator)) {
+            details.append("Lifecycle indicator mismatch: expected ").append(indicator)
+                  .append(", got ").append(actualIndicator).append("; ");
+        }
+        if (!traceId.equals(actualTraceId)) {
+            details.append("Trace ID mismatch: expected ").append(traceId)
+                  .append(", got ").append(actualTraceId).append("; ");
+        }
+    }
+
+    private static void validateBusinessActivity(String expected, JsonNode actualJson, StringBuilder details) {
+        String brandId = expected.substring(54, 57);
+        String serviceLevel = expected.substring(57, 58);
+        String serviceId = expected.substring(58, 64);
+
+        String actualBrandId = getJsonValue(actualJson, "transaction.acquirerTraceData.businessActivity.acceptanceBrandId");
+        String actualServiceLevel = getJsonValue(actualJson, "transaction.acquirerTraceData.businessActivity.businessServiceLevelCode");
+        String actualServiceId = getJsonValue(actualJson, "transaction.acquirerTraceData.businessActivity.businessServiceIdCode");
+
+        if (!brandId.equals(actualBrandId)) {
+            details.append("Brand ID mismatch: expected ").append(brandId)
+                  .append(", got ").append(actualBrandId).append("; ");
+        }
+        if (!serviceLevel.equals(actualServiceLevel)) {
+            details.append("Service level mismatch: expected ").append(serviceLevel)
+                  .append(", got ").append(actualServiceLevel).append("; ");
+        }
+        if (!serviceId.equals(actualServiceId)) {
+            details.append("Service ID mismatch: expected ").append(serviceId)
+                  .append(", got ").append(actualServiceId).append("; ");
+        }
+    }
+
+    private static void validateDate(String fieldName, String expected, JsonNode actualJson, String jsonPath, StringBuilder details) {
+        String actual = getJsonValue(actualJson, jsonPath);
+        if (!expected.equals(actual)) {
+            details.append(fieldName).append(" mismatch: expected ").append(expected)
+                  .append(", got ").append(actual).append("; ");
+        }
+    }
+
+    private static void validateSimpleField(String fieldName, String expected, JsonNode actualJson, String jsonPath, StringBuilder details) {
+        String actual = getJsonValue(actualJson, jsonPath);
+        if (!expected.equals(actual)) {
+            details.append(fieldName).append(" mismatch: expected ").append(expected)
+                  .append(", got ").append(actual).append("; ");
+        }
+    }
+
+    private static String mapCurrencyConversionIndicator(String indicator) {
+        switch (indicator) {
+            case "0": return "Not Applicable";
+            case "1": return "Matched with authorization";
+            case "2": return "No match found";
+            default: return indicator;
         }
     }
 }

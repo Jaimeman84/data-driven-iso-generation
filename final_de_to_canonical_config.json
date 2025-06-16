@@ -1412,7 +1412,9 @@
     "name": "Additional Data, Private Acquirer",
     "canonical": [
       "transaction.additionalData.formatIdentifier",
-      "transaction.additionalData.MCAssignedID"
+      "transaction.additionalData.MCAssignedID",
+      "transaction.additionalData.isCnp",
+      "transaction.additionalData.address.zipCode"
     ],
     "format": "lllvar",
     "type": "alphanumeric",
@@ -1519,24 +1521,168 @@
       "transaction.acquirerTraceData.settlementServiceLevelCode",
       "transaction.acquirerTraceData.currencyConversionDate",
       "transaction.acquirerTraceData.currencyConversionIndicator",
-      "transaction.acquirerTraceData.acquirerReferenceNumberObjectmixedUse",
-      "transaction.acquirerTraceData.acquirerReferenceNumberObjectacquirerReferenceId",
-      "transaction.acquirerTraceData.acquirerReferenceNumberObjectjulianDate",
-      "transaction.acquirerTraceData.acquirerReferenceNumberObjectacquirerSequence",
-      "transaction.acquirerTraceData.acquirerReferenceNumberObjectcheckDigit",
+      "transaction.acquirerTraceData.acquirerReferenceNumberObject.mixedUse",
+      "transaction.acquirerTraceData.acquirerReferenceNumberObject.acquirerReferenceId",
+      "transaction.acquirerTraceData.acquirerReferenceNumberObject.julianDate",
+      "transaction.acquirerTraceData.acquirerReferenceNumberObject.acquirerSequence",
+      "transaction.acquirerTraceData.acquirerReferenceNumberObject.checkDigit",
       "transaction.acquirerTraceData.transactionLifeCycle.lifeCycleSupportIndicator",
       "transaction.acquirerTraceData.transactionLifeCycle.traceId",
       "transaction.acquirerTraceData.businessActivity.acceptanceBrandId",
       "transaction.acquirerTraceData.businessActivity.businessServiceLevelCode",
       "transaction.acquirerTraceData.businessActivity.businessServiceIdCode"
     ],
-    "format": "lllvar",
+    "format": "fixed",
     "type": "alphanumeric",
-    "length": null,
-    "notes": "Optional for Mastercard Networks Exchange ISO acquirers. Not passed by default to ISO issuers but can be configured.",
-    "max_length": 100,
+    "length": 93,
+    "notes": "Contains acquirer trace data including format code, reference numbers, and various business indicators.",
     "active": false,
-    "SampleData": "AB123"
+    "SampleData": "513333332025147258369129101478159236961000000000010505147500000562325050200309250502812505021",
+    "validation": {
+      "type": "acquirer_trace_data",
+      "rules": {
+        "positions": {
+          "formatCode": {
+            "position": 1,
+            "mapping": {
+              "5": "DUAL_MESSAGE_CLEARING_FORMAT_CODE"
+            }
+          },
+          "acquirerReferenceNumber": {
+            "start": 2,
+            "end": 24,
+            "components": {
+              "mixedUse": {
+                "position": 2,
+                "length": 1
+              },
+              "acquirerReferenceId": {
+                "start": 3,
+                "end": 8,
+                "length": 6
+              },
+              "julianDate": {
+                "start": 9,
+                "end": 12,
+                "length": 4
+              },
+              "acquirerSequence": {
+                "start": 13,
+                "end": 23,
+                "length": 11
+              },
+              "checkDigit": {
+                "position": 24,
+                "length": 1
+              }
+            }
+          },
+          "terminalType": {
+            "start": 25,
+            "end": 27,
+            "length": 3
+          },
+          "acquirerInstituionId": {
+            "start": 28,
+            "end": 38,
+            "length": 11
+          },
+          "transactionLifeCycle": {
+            "start": 39,
+            "end": 54,
+            "components": {
+              "lifeCycleSupportIndicator": {
+                "position": 39,
+                "length": 1
+              },
+              "traceId": {
+                "start": 40,
+                "end": 54,
+                "length": 15
+              }
+            }
+          },
+          "businessActivity": {
+            "start": 55,
+            "end": 64,
+            "components": {
+              "acceptanceBrandId": {
+                "start": 55,
+                "end": 57,
+                "length": 3
+              },
+              "businessServiceLevelCode": {
+                "position": 58,
+                "length": 1
+              },
+              "businessServiceIdCode": {
+                "start": 59,
+                "end": 64,
+                "length": 6
+              }
+            }
+          },
+          "settlementIndicator": {
+            "position": 65,
+            "length": 1
+          },
+          "interchangeRateDesignator": {
+            "start": 66,
+            "end": 67,
+            "length": 2
+          },
+          "businessDate": {
+            "start": 68,
+            "end": 73,
+            "length": 6,
+            "format": "YYMMDD"
+          },
+          "productIdentifier": {
+            "start": 74,
+            "end": 76,
+            "length": 3
+          },
+          "businessCycle": {
+            "start": 77,
+            "end": 78,
+            "length": 2
+          },
+          "settlementDate": {
+            "start": 79,
+            "end": 84,
+            "length": 6,
+            "format": "YYMMDD"
+          },
+          "mastercardRateIndicator": {
+            "position": 85,
+            "length": 1
+          },
+          "settlementServiceLevelCode": {
+            "position": 86,
+            "length": 1,
+            "mapping": {
+              "1": "Regional",
+              "3": "Intracurrency"
+            }
+          },
+          "currencyConversionDate": {
+            "start": 87,
+            "end": 92,
+            "length": 6,
+            "format": "YYMMDD"
+          },
+          "currencyConversionIndicator": {
+            "position": 93,
+            "length": 1,
+            "mapping": {
+              "0": "Not Applicable",
+              "1": "Matched with authorization",
+              "2": "No match found"
+            }
+          }
+        }
+      }
+    }
   },
   "128": {
     "name": "Message Authenticate Code",
