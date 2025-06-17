@@ -913,6 +913,12 @@ public class CreateIsoMessage  {
 
     private static boolean validateIncrementalAuthData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
         try {
+            // Only validate for MTI 0220, skip otherwise
+            if (!"0220".equals(isoFields.get("MTI"))) {
+                result.addSkippedField(de, expected, "DE " + de + " validation only applicable for MTI 0220");
+                return true;
+            }
+
             // Check MTI requirement from configuration
             if (rules.has("mti") && rules.get("mti").has("required")) {
                 String requiredMti = rules.get("mti").get("required").asText();
@@ -920,8 +926,9 @@ public class CreateIsoMessage  {
                     rules.get("mti").get("skipReason").asText() : 
                     "DE " + de + " validation only applicable for MTI " + requiredMti;
                 
-                String mti = String.valueOf(isoFields.get("MTI")); // Convert to String
-                if (!requiredMti.equals(mti)) {
+                // Safely get MTI value with null check
+                String currentMti = isoFields.get("MTI");
+                if (currentMti == null || !requiredMti.equals(currentMti)) {
                     result.addSkippedField(de, expected, skipReason);
                     return true;
                 }
