@@ -811,7 +811,20 @@ public class CreateIsoMessage  {
         JsonNode config = fieldConfig.get(de);
         if (config != null && config.has("validation")) {
             JsonNode validation = config.get("validation");
-            return validation.has("skip") && validation.get("skip").asBoolean();
+            
+            // Check for explicit skip flag
+            if (validation.has("skip") && validation.get("skip").asBoolean()) {
+                return true;
+            }
+            
+            // Check for MTI-dependent validation
+            if (validation.has("type") && validation.get("type").asText().equals("incremental_auth_data")) {
+                JsonNode rules = validation.get("rules");
+                if (rules != null && rules.has("mti") && rules.get("mti").has("required")) {
+                    String requiredMti = rules.get("mti").get("required").asText();
+                    return !requiredMti.equals(isoFields.get(0));
+                }
+            }
         }
         return false;
     }
@@ -914,7 +927,7 @@ public class CreateIsoMessage  {
     private static boolean validateIncrementalAuthData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
         try {
             // Only validate for MTI 0220, skip otherwise
-            if (!"0220".equals(isoFields.get("MTI"))) {
+            if (!"0220".equals(isoFields.get(0))) {
                 result.addSkippedField(de, expected, "DE " + de + " validation only applicable for MTI 0220");
                 return true;
             }
@@ -927,7 +940,7 @@ public class CreateIsoMessage  {
                     "DE " + de + " validation only applicable for MTI " + requiredMti;
                 
                 // Safely get MTI value with null check
-                String currentMti = isoFields.get("MTI");
+                String currentMti = isoFields.get(0);
                 if (currentMti == null || !requiredMti.equals(currentMti)) {
                     result.addSkippedField(de, expected, skipReason);
                     return true;
