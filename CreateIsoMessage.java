@@ -2817,7 +2817,6 @@ public class CreateIsoMessage  {
             // Validate only the relevant path based on type
             if ("80".equals(typeIndicator)) {
                 // Only validate reversal path
-                String actualValue = getJsonValue(actualJson, "transaction.reversalReason");
                 JsonNode reversalReasons = rules.get("positions").get("reversalReasons");
                 
                 if (!reversalReasons.has(reasonCode)) {
@@ -2826,21 +2825,22 @@ public class CreateIsoMessage  {
                     return false;
                 }
                 
-                String expectedValue = reversalReasons.get(reasonCode).asText();
-                if (!expectedValue.equals(actualValue)) {
+                String expectedEnum = reversalReasons.get(reasonCode).asText();
+                String actualValue = getJsonValue(actualJson, "transaction.reversalReason");
+                
+                if (!expectedEnum.equals(actualValue)) {
                     details.append("Reversal reason mismatch: expected ")
-                          .append(expectedValue)
+                          .append(expectedEnum)
                           .append(", got ")
                           .append(actualValue);
-                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    result.addFailedField(de, expected, details.toString());
                     return false;
                 }
                 
-                result.addPassedField(de, expected, actual);
+                result.addPassedField(de, expected, actualValue);
                 return true;
             } else if ("40".equals(typeIndicator)) {
                 // Only validate advice path
-                String actualValue = getJsonValue(actualJson, "transaction.adviceReason");
                 JsonNode adviceReasons = rules.get("positions").get("adviceReasons");
                 
                 if (!adviceReasons.has(reasonCode)) {
@@ -2849,17 +2849,19 @@ public class CreateIsoMessage  {
                     return false;
                 }
                 
-                String expectedValue = adviceReasons.get(reasonCode).asText();
-                if (!expectedValue.equals(actualValue)) {
+                String expectedEnum = adviceReasons.get(reasonCode).asText();
+                String actualValue = getJsonValue(actualJson, "transaction.adviceReason");
+                
+                if (!expectedEnum.equals(actualValue)) {
                     details.append("Advice reason mismatch: expected ")
-                          .append(expectedValue)
+                          .append(expectedEnum)
                           .append(", got ")
                           .append(actualValue);
-                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    result.addFailedField(de, expected, details.toString());
                     return false;
                 }
                 
-                result.addPassedField(de, expected, actual);
+                result.addPassedField(de, expected, actualValue);
                 return true;
             } else {
                 details.append("Invalid message type indicator: ").append(typeIndicator)
