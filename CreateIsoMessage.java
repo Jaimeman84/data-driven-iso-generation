@@ -905,6 +905,8 @@ public class CreateIsoMessage  {
                     case "incremental_auth_data":
                         System.out.println("Processing incremental authorization data validation for DE " + de);
                         return validateIncrementalAuthData(de, expected, actual, result, validation.get("rules"));
+                    case "advice_reversal_code":
+                        return validateAdviceReversalCode(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -2796,3 +2798,79 @@ public class CreateIsoMessage  {
             row.createCell(6).setCellValue(details.toString());
         }
     }
+
+    private static boolean validateAdviceReversalCode(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            if (expected == null || actual == null || expected.length() != 4) {
+                result.addFailedField(de, expected, "Invalid advice/reversal code length");
+                return false;
+            }
+
+            JsonNode actualJson = objectMapper.readTree(actual);
+            StringBuilder details = new StringBuilder();
+            boolean allValid = true;
+
+            // Get positions 1-2 to determine type (80=reversal, 40=advice)
+            String typeIndicator = expected.substring(0, 2);
+            // Get positions 3-4 for the reason code
+            String reasonCode = expected.substring(2, 4);
+
+            // Get the type mapping
+            JsonNode typeMapping = rules.get("positions").get("type").get("mapping");
+            String messageType = typeMapping.has(typeIndicator) ? 
+                typeMapping.get(typeIndicator).asText() : "UNKNOWN";
+
+            // Validate based on type
+            if ("REVERSAL".equals(messageType)) {
+                String actualReversal = getJsonValue(actualJson, "transaction.reversalReasonCode");
+                JsonNode reversalReasons = rules.get("positions").get("reversalReasons");
+                
+                if (!reversalReasons.has(reasonCode)) {
+                    details.append("Invalid reversal reason code: ").append(reasonCode);
+                    allValid = false;
+                } else {
+                    String expectedReversal = reversalReasons.get(reasonCode).asText();
+                    if (!expectedReversal.equals(actualReversal)) {
+                        details.append("Reversal reason mismatch: expected ")
+                              .append(expectedReversal)
+                              .append(", got ")
+                              .append(actualReversal);
+                        allValid = false;
+                    }
+                }
+            } else if ("ADVICE".equals(messageType)) {
+                String actualAdvice = getJsonValue(actualJson, "transaction.adviceReasonCode");
+                JsonNode adviceReasons = rules.get("positions").get("adviceReasons");
+                
+                if (!adviceReasons.has(reasonCode)) {
+                    details.append("Invalid advice reason code: ").append(reasonCode);
+                    allValid = false;
+                } else {
+                    String expectedAdvice = adviceReasons.get(reasonCode).asText();
+                    if (!expectedAdvice.equals(actualAdvice)) {
+                        details.append("Advice reason mismatch: expected ")
+                              .append(expectedAdvice)
+                              .append(", got ")
+                              .append(actualAdvice);
+                        allValid = false;
+                    }
+                }
+            } else {
+                details.append("Invalid message type indicator: ").append(typeIndicator)
+                      .append(" (must be 40 or 80)");
+                allValid = false;
+            }
+
+            if (allValid) {
+                result.addPassedField(de, expected, actual);
+            } else {
+                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+            }
+
+            return true;
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to validate advice/reversal code: " + e.getMessage());
+            return false;
+        }
+    }
+}
