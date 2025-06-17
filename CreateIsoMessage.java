@@ -913,6 +913,20 @@ public class CreateIsoMessage  {
 
     private static boolean validateIncrementalAuthData(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
         try {
+            // Check MTI requirement from configuration
+            if (rules.has("mti") && rules.get("mti").has("required")) {
+                String requiredMti = rules.get("mti").get("required").asText();
+                String skipReason = rules.get("mti").has("skipReason") ? 
+                    rules.get("mti").get("skipReason").asText() : 
+                    "DE " + de + " validation only applicable for MTI " + requiredMti;
+                
+                String mti = isoFields.get("MTI");
+                if (!requiredMti.equals(mti)) {
+                    result.addSkippedField(de, expected, skipReason);
+                    return true;
+                }
+            }
+
             if (expected == null || actual == null || expected.length() != 12) {
                 result.addFailedField(de, expected, "Invalid incremental authorization data length");
                 return true;

@@ -1481,12 +1481,16 @@
     "format": "fixed",
     "type": "alphanumeric",
     "length": 12,
-    "notes": "Contains incremental authorization data in TLV format. CN tag represents count, SN tag represents sequence number.",
+    "notes": "Contains incremental authorization data in TLV format. CN tag represents count, SN tag represents sequence number. Only valid for MTI 0220.",
     "active": false,
     "SampleData": "CN0201SN0201",
     "validation": {
       "type": "incremental_auth_data",
       "rules": {
+        "mti": {
+          "required": "0220",
+          "skipReason": "DE 124 validation only applicable for MTI 0220"
+        },
         "tags": {
           "CN": {
             "name": "count",
