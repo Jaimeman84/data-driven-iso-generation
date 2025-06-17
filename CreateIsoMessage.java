@@ -2821,12 +2821,18 @@ public class CreateIsoMessage  {
                 
                 if (!reversalReasons.has(reasonCode)) {
                     details.append("Invalid reversal reason code: ").append(reasonCode);
-                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    result.addFailedField(de, expected, details.toString());
                     return false;
                 }
                 
                 String expectedEnum = reversalReasons.get(reasonCode).asText();
-                String actualValue = getJsonValue(actualJson, "transaction.reversalReason");
+                String actualValue = getJsonValue(actualJson, "transaction.reversalReasonCode");
+                
+                if (actualValue == null) {
+                    details.append("Missing reversal reason code in response");
+                    result.addFailedField(de, expected, details.toString());
+                    return false;
+                }
                 
                 if (!expectedEnum.equals(actualValue)) {
                     details.append("Reversal reason mismatch: expected ")
@@ -2845,12 +2851,18 @@ public class CreateIsoMessage  {
                 
                 if (!adviceReasons.has(reasonCode)) {
                     details.append("Invalid advice reason code: ").append(reasonCode);
-                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    result.addFailedField(de, expected, details.toString());
                     return false;
                 }
                 
                 String expectedEnum = adviceReasons.get(reasonCode).asText();
-                String actualValue = getJsonValue(actualJson, "transaction.adviceReason");
+                String actualValue = getJsonValue(actualJson, "transaction.adviceReasonCode");
+                
+                if (actualValue == null) {
+                    details.append("Missing advice reason code in response");
+                    result.addFailedField(de, expected, details.toString());
+                    return false;
+                }
                 
                 if (!expectedEnum.equals(actualValue)) {
                     details.append("Advice reason mismatch: expected ")
@@ -2866,7 +2878,7 @@ public class CreateIsoMessage  {
             } else {
                 details.append("Invalid message type indicator: ").append(typeIndicator)
                       .append(" (must be 40 or 80)");
-                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                result.addFailedField(de, expected, details.toString());
                 return false;
             }
         } catch (Exception e) {

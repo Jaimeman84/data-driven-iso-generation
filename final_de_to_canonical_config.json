@@ -1193,8 +1193,8 @@
   "60": {
     "name": "Advice/Reversal Reason Code",
     "canonical": [
-      "transaction.reversalReasonCode",
-      "transaction.adviceReasonCode"
+      "transaction.reversalReason",
+      "transaction.adviceReason"
     ],
     "format": "fixed",
     "type": "alphanumeric",
