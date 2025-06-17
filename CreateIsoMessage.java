@@ -920,7 +920,7 @@ public class CreateIsoMessage  {
                     rules.get("mti").get("skipReason").asText() : 
                     "DE " + de + " validation only applicable for MTI " + requiredMti;
                 
-                String mti = isoFields.get("MTI");
+                String mti = String.valueOf(isoFields.get("MTI")); // Convert to String
                 if (!requiredMti.equals(mti)) {
                     result.addSkippedField(de, expected, skipReason);
                     return true;
@@ -928,7 +928,7 @@ public class CreateIsoMessage  {
             }
 
             if (expected == null || actual == null || expected.length() != 12) {
-                result.addFailedField(de, expected, "Invalid incremental authorization data length");
+                result.addFailedField(de, String.valueOf(expected), "Invalid incremental authorization data length");
                 return true;
             }
 
@@ -950,7 +950,7 @@ public class CreateIsoMessage  {
             // Validate count (CN tag)
             String expectedCount = expectedValues.get("CN");
             String actualCount = getJsonValue(actualJson, "transaction.incrementalAuthorization.count");
-            if (!expectedCount.equals(actualCount)) {
+            if (!String.valueOf(expectedCount).equals(String.valueOf(actualCount))) {
                 details.append("Count mismatch: expected ").append(expectedCount)
                       .append(", got ").append(actualCount).append("; ");
                 allValid = false;
@@ -959,7 +959,7 @@ public class CreateIsoMessage  {
             // Validate sequence (SN tag)
             String expectedSequence = expectedValues.get("SN");
             String actualSequence = getJsonValue(actualJson, "transaction.incrementalAuthorization.sequence");
-            if (!expectedSequence.equals(actualSequence)) {
+            if (!String.valueOf(expectedSequence).equals(String.valueOf(actualSequence))) {
                 details.append("Sequence mismatch: expected ").append(expectedSequence)
                       .append(", got ").append(actualSequence).append("; ");
                 allValid = false;
@@ -967,22 +967,25 @@ public class CreateIsoMessage  {
 
             // Validate authorization type (always MULTIPLE_COMPLETION)
             String actualAuthType = getJsonValue(actualJson, "transaction.incrementalAuthorization.incrementalAuthorizationType");
-            String expectedAuthType = "MULTIPLE_COMPLETION";
-            if (!expectedAuthType.equals(actualAuthType)) {
+            String expectedAuthType = rules.get("authorizationType")
+                                         .get("mapping")
+                                         .get("default")
+                                         .asText();
+            if (!String.valueOf(expectedAuthType).equals(String.valueOf(actualAuthType))) {
                 details.append("Authorization type mismatch: expected ").append(expectedAuthType)
                       .append(", got ").append(actualAuthType);
                 allValid = false;
             }
 
             if (allValid) {
-                result.addPassedField(de, expected, actual);
+                result.addPassedField(de, String.valueOf(expected), actual);
             } else {
-                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                result.addFailedField(de, String.valueOf(expected), actual + " [" + details.toString() + "]");
             }
 
             return true;
         } catch (Exception e) {
-            result.addFailedField(de, expected, "Failed to parse incremental authorization data: " + e.getMessage());
+            result.addFailedField(de, String.valueOf(expected), "Failed to parse incremental authorization data: " + e.getMessage());
             return false;
         }
     }
