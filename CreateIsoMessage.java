@@ -2808,54 +2808,65 @@ public class CreateIsoMessage  {
 
             JsonNode actualJson = objectMapper.readTree(actual);
             StringBuilder details = new StringBuilder();
-            boolean allValid = true;
 
             // Get positions 1-2 to determine type (80=reversal, 40=advice)
             String typeIndicator = expected.substring(0, 2);
             // Get positions 3-4 for the reason code
             String reasonCode = expected.substring(2, 4);
 
-            // Determine the canonical field based on type indicator
-            String canonicalField;
-            JsonNode reasonMapping;
+            // Validate only the relevant path based on type
             if ("80".equals(typeIndicator)) {
-                canonicalField = "transaction.reversalReason";
-                reasonMapping = rules.get("positions").get("reversalReasons");
+                // Only validate reversal path
+                String actualValue = getJsonValue(actualJson, "transaction.reversalReason");
+                JsonNode reversalReasons = rules.get("positions").get("reversalReasons");
+                
+                if (!reversalReasons.has(reasonCode)) {
+                    details.append("Invalid reversal reason code: ").append(reasonCode);
+                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    return false;
+                }
+                
+                String expectedValue = reversalReasons.get(reasonCode).asText();
+                if (!expectedValue.equals(actualValue)) {
+                    details.append("Reversal reason mismatch: expected ")
+                          .append(expectedValue)
+                          .append(", got ")
+                          .append(actualValue);
+                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    return false;
+                }
+                
+                result.addPassedField(de, expected, actual);
+                return true;
             } else if ("40".equals(typeIndicator)) {
-                canonicalField = "transaction.adviceReason";
-                reasonMapping = rules.get("positions").get("adviceReasons");
+                // Only validate advice path
+                String actualValue = getJsonValue(actualJson, "transaction.adviceReason");
+                JsonNode adviceReasons = rules.get("positions").get("adviceReasons");
+                
+                if (!adviceReasons.has(reasonCode)) {
+                    details.append("Invalid advice reason code: ").append(reasonCode);
+                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    return false;
+                }
+                
+                String expectedValue = adviceReasons.get(reasonCode).asText();
+                if (!expectedValue.equals(actualValue)) {
+                    details.append("Advice reason mismatch: expected ")
+                          .append(expectedValue)
+                          .append(", got ")
+                          .append(actualValue);
+                    result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                    return false;
+                }
+                
+                result.addPassedField(de, expected, actual);
+                return true;
             } else {
                 details.append("Invalid message type indicator: ").append(typeIndicator)
                       .append(" (must be 40 or 80)");
                 result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
                 return false;
             }
-
-            // Get actual value from the correct canonical field
-            String actualValue = getJsonValue(actualJson, canonicalField);
-
-            // Validate the reason code
-            if (!reasonMapping.has(reasonCode)) {
-                details.append("Invalid reason code: ").append(reasonCode);
-                allValid = false;
-            } else {
-                String expectedValue = reasonMapping.get(reasonCode).asText();
-                if (!expectedValue.equals(actualValue)) {
-                    details.append("Reason mismatch: expected ")
-                          .append(expectedValue)
-                          .append(", got ")
-                          .append(actualValue);
-                    allValid = false;
-                }
-            }
-
-            if (allValid) {
-                result.addPassedField(de, expected, actual);
-            } else {
-                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
-            }
-
-            return true;
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to validate advice/reversal code: " + e.getMessage());
             return false;
