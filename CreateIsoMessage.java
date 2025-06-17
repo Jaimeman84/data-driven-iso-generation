@@ -7,6 +7,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hssf.usermodel.HSSFFormulaEvaluator;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import websocket.WebSocketClient;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 
 import static utilities.CustomTestData.generateCustomValue;
 import static utilities.CustomTestData.generateRandomText;
+import static websocket.WebSocketClient.responseMessage;
 
 public class CreateIsoMessage  {
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -30,6 +32,7 @@ public class CreateIsoMessage  {
     private static final String DEFAULT_MTI = "0100"; // Default MTI value
     private static final String PARSER_URL = "enter url here"; // Replace with actual URL
     private static final String CANONICAL_URL = "enter url here"; // Replace with actual URL
+    private static final String WS_URL = "ws://localhost:8080/ws"; // Replace with actual URL
 
      public void i_create_iso_message(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
@@ -278,8 +281,6 @@ public class CreateIsoMessage  {
                     return entry.getKey();
                 })
                 .orElse(null);
-
-
     }
 
     private static String bitmapToHex(boolean[] bitmap) {
@@ -466,21 +467,43 @@ public class CreateIsoMessage  {
                     messageCell.setCellValue(isoMessage);
 
                     try {
-                        // Process the ISO message using the new processor
-                        IsoMessageProcessor processor = new IsoMessageProcessor(
-                            "ws://your-websocket-url:port/service",  // Replace with actual WebSocket URL
-                            PARSER_URL
-                        );
-                        
-                        IsoMessageProcessor.ProcessedIsoResponse response = 
-                            processor.processIsoMessage(isoMessage, isoFields.get(0));
+                        WebSocketManager.init(PARSER_URL);
+                        WebSocketManager.sendMessage(isoMessage);
+                        String wsResponse = WebSocketClient.getResponseMessage();
+                        WebSocketManager.close();
 
-                        // Create a cell for the response (Column CN)
+                        // Parse response to get DE39
+                        String parsedResponse = sendIsoMessageToParser(wsResponse);                       
+                        JsonNode responseArray = objectMapper.readTree(parsedResponse);
+                        
+                        // Extract DE39 (Response Code) from array
+                        String responseCode = null;
+                        if (responseArray.isArray()) {
+                            // Iterate through array indices
+                            for (int i = 0; i < responseArray.size(); i++) {
+                                JsonNode element = responseArray.get(i);
+                                String elementId = element.get("dataElementId").asText();
+                                System.out.println("Checking element " + i + " with ID: " + elementId); // Debug print
+                                
+                                if ("39".equals(elementId)) {
+                                    responseCode = element.get("value").asText();
+                                    System.out.println("Found DE39 with value: " + responseCode); // Debug print
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Write response code to column CN
                         Cell responseCell = dataRow.createCell(92); // Column CN
-                        responseCell.setCellValue(response.getFormattedResponse());
+                        if (responseCode != null) {
+                            responseCell.setCellValue(responseCode);
+                         } else {
+                            responseCell.setCellValue("No DE39 found in response");
+                         }
 
                     } catch (Exception e) {
                         System.out.println("\nWebSocket/Parser Error: " + e.getMessage());
+                        e.printStackTrace(); // Print full stack trace for debugging
                         Cell responseCell = dataRow.createCell(92); // Column CN
                         responseCell.setCellValue("Error: " + e.getMessage());
                     }
@@ -2736,4 +2759,3 @@ public class CreateIsoMessage  {
             row.createCell(6).setCellValue(details.toString());
         }
     }
-}
