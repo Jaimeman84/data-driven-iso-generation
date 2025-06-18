@@ -2,6 +2,7 @@ package utilities;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.datatable.DataTable;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
@@ -729,8 +730,27 @@ public class CreateIsoMessage  {
 
             // Special handling for DE 95 (Replacement Amounts) when MTI is not 0420
             if (de.equals("95") && !isoFields.getOrDefault(0, "").equals("0420")) {
-                result.addSkippedField(de, expectedValue, "DE 95 validation only applicable for MTI 0420");
+                result.addSkippedField(de, expectedValue, "DE 95 is not applicable for MTI " + isoFields.get(0));
                 continue;
+            }
+
+            // Special handling for DE 60 (Advice/Reversal Reason Code)
+            if (de.equals("60")) {
+                String typeIndicator = expectedValue.substring(0, 2);
+                List<String> canonicalPaths = getCanonicalPaths(de);
+                
+                // For reversal (80), only keep the reversalReason path
+                if ("80".equals(typeIndicator)) {
+                    canonicalPaths.removeIf(path -> path.contains("adviceReason"));
+                }
+                // For advice (40), only keep the adviceReason path
+                else if ("40".equals(typeIndicator)) {
+                    canonicalPaths.removeIf(path -> path.contains("reversalReason"));
+                }
+                
+                // Update the config with filtered paths
+                JsonNode config = fieldConfig.get(de);
+                ((ObjectNode) config).put("canonical", objectMapper.valueToTree(canonicalPaths));
             }
 
             List<String> canonicalPaths = getCanonicalPaths(de);
