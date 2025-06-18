@@ -727,6 +727,12 @@ public class CreateIsoMessage  {
                 continue;
             }
 
+            // Special handling for DE 95 (Replacement Amounts) when MTI is not 0420
+            if (de.equals("95") && !isoFields.getOrDefault(0, "").equals("0420")) {
+                result.addSkippedField(de, expectedValue, "DE 95 validation only applicable for MTI 0420");
+                continue;
+            }
+
             List<String> canonicalPaths = getCanonicalPaths(de);
             if (!canonicalPaths.isEmpty()) {
                 boolean allPathsValid = true;
