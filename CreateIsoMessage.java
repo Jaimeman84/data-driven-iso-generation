@@ -907,6 +907,9 @@ public class CreateIsoMessage  {
                         return validateIncrementalAuthData(de, expected, actual, result, validation.get("rules"));
                     case "advice_reversal_code":
                         return validateAdviceReversalCode(de, expected, actual, result, validation.get("rules"));
+                    case "replacement_amounts":
+                        System.out.println("Processing replacement amounts validation for DE " + de);
+                        return validateReplacementAmounts(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -2883,6 +2886,113 @@ public class CreateIsoMessage  {
             }
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to validate advice/reversal code: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static boolean validateReplacementAmounts(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
+        try {
+            // Check MTI requirement from configuration
+            if (rules.has("mti") && rules.get("mti").has("required")) {
+                String requiredMti = rules.get("mti").get("required").asText();
+                String skipReason = rules.get("mti").has("skipReason") ? 
+                    rules.get("mti").get("skipReason").asText() : 
+                    "DE " + de + " validation only applicable for MTI " + requiredMti;
+                
+                // Safely get MTI value with null check
+                String currentMti = isoFields.get(0);
+                if (currentMti == null || !requiredMti.equals(currentMti)) {
+                    result.addSkippedField(de, expected, skipReason);
+                    return true;
+                }
+            }
+
+            if (expected == null || actual == null || expected.length() != 42) {
+                result.addFailedField(de, expected, "Invalid replacement amounts length");
+                return false;
+            }
+
+            JsonNode actualJson = objectMapper.readTree(actual);
+            StringBuilder details = new StringBuilder();
+            boolean allValid = true;
+
+            JsonNode positions = rules.get("positions");
+
+            // Validate Transaction Amount (positions 1-12)
+            String transactionAmount = expected.substring(0, 12);
+            String normalizedTransactionAmount = String.valueOf(Long.parseLong(transactionAmount)); // Remove leading zeros
+            String actualTransactionAmount = getJsonValue(actualJson, "transaction.replacementAmount.transactionAmount.amount");
+            boolean transactionAmountValid = normalizedTransactionAmount.equals(actualTransactionAmount);
+            details.append(String.format("Transaction Amount: %s->%s (%s), ",
+                    transactionAmount, normalizedTransactionAmount, transactionAmountValid ? "✓" : "✗"));
+            allValid &= transactionAmountValid;
+
+            // Validate Settlement Amount (positions 13-24)
+            String settlementAmount = expected.substring(12, 24);
+            String normalizedSettlementAmount = String.valueOf(Long.parseLong(settlementAmount)); // Remove leading zeros
+            String actualSettlementAmount = getJsonValue(actualJson, "transaction.replacementAmount.settlementAmount.amount");
+            boolean settlementAmountValid = normalizedSettlementAmount.equals(actualSettlementAmount);
+            details.append(String.format("Settlement Amount: %s->%s (%s), ",
+                    settlementAmount, normalizedSettlementAmount, settlementAmountValid ? "✓" : "✗"));
+            allValid &= settlementAmountValid;
+
+            // Validate Transaction Fees (positions 24-33)
+            JsonNode transactionFees = positions.get("transactionFees");
+            
+            // Validate Transaction Fees D/C Indicator (position 24)
+            String transactionFeesIndicator = expected.substring(23, 24);
+            String expectedTransactionFeesIndicator = transactionFees.get("components")
+                    .get("debitCreditIndicator").get("mapping").get(transactionFeesIndicator).asText();
+            String actualTransactionFeesIndicator = getJsonValue(actualJson, 
+                    "transaction.replacementAmount.transactionFees.transactionFees.debitCreditIndicatorType");
+            boolean transactionFeesIndicatorValid = expectedTransactionFeesIndicator.equals(actualTransactionFeesIndicator);
+            details.append(String.format("Transaction Fees D/C: %s->%s (%s), ",
+                    transactionFeesIndicator, expectedTransactionFeesIndicator, transactionFeesIndicatorValid ? "✓" : "✗"));
+            allValid &= transactionFeesIndicatorValid;
+
+            // Validate Transaction Fees Amount (positions 25-33)
+            String transactionFeesAmount = expected.substring(24, 33);
+            String normalizedTransactionFeesAmount = String.valueOf(Long.parseLong(transactionFeesAmount)); // Remove leading zeros
+            String actualTransactionFeesAmount = getJsonValue(actualJson, 
+                    "transaction.replacementAmount.transactionFees.transactionFees.amount");
+            boolean transactionFeesAmountValid = normalizedTransactionFeesAmount.equals(actualTransactionFeesAmount);
+            details.append(String.format("Transaction Fees Amount: %s->%s (%s), ",
+                    transactionFeesAmount, normalizedTransactionFeesAmount, transactionFeesAmountValid ? "✓" : "✗"));
+            allValid &= transactionFeesAmountValid;
+
+            // Validate Settlement Fees (positions 34-42)
+            JsonNode settlementFees = positions.get("settlementFees");
+            
+            // Validate Settlement Fees D/C Indicator (position 34)
+            String settlementFeesIndicator = expected.substring(33, 34);
+            String expectedSettlementFeesIndicator = settlementFees.get("components")
+                    .get("debitCreditIndicator").get("mapping").get(settlementFeesIndicator).asText();
+            String actualSettlementFeesIndicator = getJsonValue(actualJson, 
+                    "transaction.replacementAmount.settlementFees.settlementFees.debitCreditIndicatorType");
+            boolean settlementFeesIndicatorValid = expectedSettlementFeesIndicator.equals(actualSettlementFeesIndicator);
+            details.append(String.format("Settlement Fees D/C: %s->%s (%s), ",
+                    settlementFeesIndicator, expectedSettlementFeesIndicator, settlementFeesIndicatorValid ? "✓" : "✗"));
+            allValid &= settlementFeesIndicatorValid;
+
+            // Validate Settlement Fees Amount (positions 35-42)
+            String settlementFeesAmount = expected.substring(34, 42);
+            String normalizedSettlementFeesAmount = String.valueOf(Long.parseLong(settlementFeesAmount)); // Remove leading zeros
+            String actualSettlementFeesAmount = getJsonValue(actualJson, 
+                    "transaction.replacementAmount.settlementFees.settlementFees.amount");
+            boolean settlementFeesAmountValid = normalizedSettlementFeesAmount.equals(actualSettlementFeesAmount);
+            details.append(String.format("Settlement Fees Amount: %s->%s (%s)",
+                    settlementFeesAmount, normalizedSettlementFeesAmount, settlementFeesAmountValid ? "✓" : "✗"));
+            allValid &= settlementFeesAmountValid;
+
+            if (allValid) {
+                result.addPassedField(de, expected, details.toString());
+            } else {
+                result.addFailedField(de, expected, details.toString());
+            }
+            return allValid;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to validate replacement amounts: " + e.getMessage());
             return false;
         }
     }

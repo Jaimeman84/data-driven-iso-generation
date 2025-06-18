@@ -1475,17 +1475,80 @@
   "95": {
     "name": "Replacement Amounts",
     "canonical": [
-      "transaction.replacementAmount.transactionAmount",
-      "transaction.replacementAmount.settlementAmount",
-      "transaction.replacementAmount.transactionFee",
-      "transaction.replacementAmount.settlementFee"
+      "transaction.replacementAmount.transactionAmount.amount",
+      "transaction.replacementAmount.settlementAmount.amount",
+      "transaction.replacementAmount.transactionFees.transactionFees.amount",
+      "transaction.replacementAmount.transactionFees.transactionFees.debitCreditIndicatorType",
+      "transaction.replacementAmount.settlementFees.settlementFees.amount",
+      "transaction.replacementAmount.settlementFees.settlementFees.debitCreditIndicatorType"
     ],
     "format": "fixed",
     "type": "alphanumeric",
     "length": 42,
     "notes": "Required from acquirers, or sent to issuers, for ATM partial dispenses and for transactions where the amount that was successful is different from the authorized amount.",
     "active": false,
-    "SampleData": "111111111111111111111111111111111111111142"
+    "SampleData": "000000000120000000000010C00000080D00000080",
+    "validation": {
+      "type": "replacement_amounts",
+      "rules": {
+        "mti": {
+          "required": "0420",
+          "skipReason": "DE 95 validation only applicable for MTI 0420"
+        },
+        "positions": {
+          "transactionAmount": {
+            "start": 1,
+            "end": 12,
+            "type": "numeric",
+            "removeLeadingZeros": true
+          },
+          "settlementAmount": {
+            "start": 13,
+            "end": 24,
+            "type": "numeric",
+            "removeLeadingZeros": true
+          },
+          "transactionFees": {
+            "start": 25,
+            "end": 33,
+            "components": {
+              "debitCreditIndicator": {
+                "position": 24,
+                "mapping": {
+                  "D": "DEBIT_AMOUNT",
+                  "C": "CREDIT_AMOUNT"
+                }
+              },
+              "amount": {
+                "start": 25,
+                "end": 33,
+                "type": "numeric",
+                "removeLeadingZeros": true
+              }
+            }
+          },
+          "settlementFees": {
+            "start": 34,
+            "end": 42,
+            "components": {
+              "debitCreditIndicator": {
+                "position": 34,
+                "mapping": {
+                  "D": "DEBIT_AMOUNT",
+                  "C": "CREDIT_AMOUNT"
+                }
+              },
+              "amount": {
+                "start": 35,
+                "end": 42,
+                "type": "numeric",
+                "removeLeadingZeros": true
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "96": {
     "name": "Message Security Code",
