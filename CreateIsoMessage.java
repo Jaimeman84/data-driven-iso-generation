@@ -340,14 +340,18 @@ public class CreateIsoMessage  {
             case BOOLEAN:
                 return String.valueOf(cell.getBooleanCellValue());
             case FORMULA:
-                try {
-                    // For formula cells, get the cached result
-                    DataFormatter formatter = new DataFormatter();
-                    return formatter.formatCellValue(cell, new HSSFFormulaEvaluator((HSSFWorkbook) cell.getSheet().getWorkbook()));
-                } catch (Exception e) {
-                    // If formula evaluation fails, get the raw formula
-                    return cell.getCellFormula();
+                if (cell.getCachedFormulaResultType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+                Date date = cell.getDateCellValue();
+                SimpleDateFormat sdf;
+                
+                if (cell.getColumnIndex() == 6) {  // DE 7 Transaction Date/Time
+                    sdf = new SimpleDateFormat("MMddHHmmss");
+                } else {
+                    sdf = new SimpleDateFormat("MMdd");
                 }
+                
+                return sdf.format(date);
+            }
             default:
                 return "";
         }
@@ -418,13 +422,33 @@ public class CreateIsoMessage  {
                     // Get the data from current row
                     Cell dataCell = dataRow.getCell(colNum);
                     String cellValue = getCellValueAsString(dataCell).trim();
+
+                    // Special handling for DE 60
+                    if (colNum == 60) {
+                        cellValue = getCellValueAsString(getCell);
+                    } else {
+                        cellValue = getCellValueAsString(dataCell).trim();
+                    }
+
+                    // Special handling for DE 11 (Column K)
+                    if (colNum == 10) {
+                        // Generate random 6-digit number
+                        String randomValue = String.format("%06d", new Random().nextInt(1000000));
+                        cellValue = randomValue;
+                        // Store for DE 37
+                        isoFields.put(11, randomValue);
+                    }
+
+                    // Special handling for DE 37 (Column AJ)
+                    if (colNum == 35) {
+                        // Get the stored DE 11 value and combine with prefix
+                        String de11Value = isoFields.getOrDefault(11, "000000");
+                        cellValue = "000001" + de11Value;
+                    }
+
                     if (cellValue.isEmpty()) {
                         continue;
                     }
-
-//                    System.out.println("\nProcessing Column " + getColumnName(colNum) + ":");
-////                    System.out.println("  Data Element Key: " + dataElementKey);
-////                    System.out.println("  Cell Value: " + cellValue);
 
                     // Determine the data type from the configuration
                     String dataType = "String"; // Default type
@@ -432,7 +456,6 @@ public class CreateIsoMessage  {
                     if (config != null && config.has("type")) {
                         dataType = config.get("type").asText();
                     }
-//                    System.out.println("  Data Type: " + dataType);
 
                     try {
                         // Get the field name from configuration
@@ -447,7 +470,6 @@ public class CreateIsoMessage  {
                         // Apply the field update using the same logic as i_create_iso_message
                         applyBddUpdate(fieldName, cellValue, dataType);
                         processedFields++;
-//                        System.out.println("  Status: Processed successfully");
                     } catch (Exception e) {
                         System.out.println("  Status: Failed to process - " + e.getMessage());
                     }
