@@ -592,17 +592,477 @@
   "39": {
     "name": "Response Code",
     "canonical": [
-      "Transaction.authorization.responseCode"
+      "transaction.response.responseCode",
+      "transaction.response.responseDescription",
+      "transaction.response.responseDomain"
     ],
     "format": "fixed",
     "type": "alphanumeric",
-    "length": 3,
-    "notes": "Indicates the result of the transaction. Example: '00' - Approved, '05' - Declined.",
-    "active": false,
-    "SampleData": "RC1",
+    "length": 2,
+    "notes": "Response code indicating transaction status and reason",
+    "active": true,
     "validation": {
-      "skip": true,
-      "reason": "Response Code is in Response (not canonicalize for request)."
+      "type": "response_code",
+      "rules": {
+        "mapping": {
+          "00": {
+            "description": "Approved or completed successfully",
+            "domain": "Auth Engine. NI for 800"
+          },
+          "01": {
+            "description": "Refer to card issuer",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "02": {
+            "description": "Refer to card issuers special conditions",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "03": {
+            "description": "Invalid merchant or use of MCC - correct and reattempt",
+            "domain": "NI && BAS - Rule Engine"
+          },
+          "04": {
+            "description": "Pick-up",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "05": {
+            "description": "Do not honor",
+            "domain": "C-Box && Auth Engine - Card or member check"
+          },
+          "06": {
+            "description": "Error",
+            "domain": "NI"
+          },
+          "07": {
+            "description": "Pick-up card, special conditions",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "08": {
+            "description": "Honor with identification (Processed as an approval)",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "09": {
+            "description": "Request in progress",
+            "domain": "NI - 101 or 201 received while 100 or 200 in progress"
+          },
+          "10": {
+            "description": "Approved for partial amount (Processed as an approval)",
+            "domain": "NA"
+          },
+          "11": {
+            "description": "Approved (VIP: Very Important Person) (Processed as an approval)",
+            "domain": "Auth Engine - Some one like Parkers or Plan person identified as Member Master"
+          },
+          "12": {
+            "description": "Invalid transaction",
+            "domain": "NI - Validation rule"
+          },
+          "13": {
+            "description": "Invalid amount",
+            "domain": "NI - Validation rule"
+          },
+          "14": {
+            "description": "Invalid card (no such number) or invalid account",
+            "domain": "NI for Luhn failure; C-Box"
+          },
+          "15": {
+            "description": "No such issuer",
+            "domain": "NI - Bin Validation"
+          },
+          "16": {
+            "description": "Approved, update track 3 (Processed as an approval)",
+            "domain": "Auth Engine (May not be applicable for NB)"
+          },
+          "18": {
+            "description": "Customer dispute, chargeback (future)",
+            "domain": "NA"
+          },
+          "19": {
+            "description": "Re-enter transaction",
+            "domain": "NI - Validation rule"
+          },
+          "23": {
+            "description": "Unacceptable transaction fee",
+            "domain": "NI - Validation rule"
+          },
+          "30": {
+            "description": "Format error",
+            "domain": "NI - Parsing error (DE 44 (Additional Response Data) needs to be populated)"
+          },
+          "31": {
+            "description": "Bank not supported by switch",
+            "domain": "NA"
+          },
+          "33": {
+            "description": "Expired card, pick-up",
+            "domain": "C-Box"
+          },
+          "34": {
+            "description": "Suspected fraud, pick-up",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "35": {
+            "description": "Card acceptor contact acquirer, pick-up",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "36": {
+            "description": "Restricted card, pick-up",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "37": {
+            "description": "Card acceptor call acquirer security, pick-up",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "38": {
+            "description": "Allowable PIN tries exceeded, pick-up",
+            "domain": "NA"
+          },
+          "39": {
+            "description": "No credit account",
+            "domain": "NA"
+          },
+          "40": {
+            "description": "Requested function not supported",
+            "domain": "NI - Validation rule"
+          },
+          "41": {
+            "description": "Lost card, pick-up",
+            "domain": "C-Box"
+          },
+          "42": {
+            "description": "No universal account",
+            "domain": "NA"
+          },
+          "43": {
+            "description": "Stolen card, pick-up",
+            "domain": "C-Box"
+          },
+          "44": {
+            "description": "No investment account",
+            "domain": "NA"
+          },
+          "51": {
+            "description": "Insufficient funds",
+            "domain": "Auth Engine - Non-integrated flow"
+          },
+          "52": {
+            "description": "No checking account",
+            "domain": "NA"
+          },
+          "53": {
+            "description": "No savings account",
+            "domain": "NA"
+          },
+          "54": {
+            "description": "Expired card",
+            "domain": "C-Box"
+          },
+          "55": {
+            "description": "Incorrect PIN",
+            "domain": "C-Box - only during certification"
+          },
+          "56": {
+            "description": "No card record",
+            "domain": "C-Box"
+          },
+          "57": {
+            "description": "Transaction not permitted to cardholder",
+            "domain": "C-Box && Auth Engine - Card or member check"
+          },
+          "58": {
+            "description": "Transaction not permitted to terminal (may also be a chargeback)",
+            "domain": "BAS - Rules engine"
+          },
+          "59": {
+            "description": "Suspected fraud",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "60": {
+            "description": "Card acceptor contact acquirer",
+            "domain": "NA"
+          },
+          "61": {
+            "description": "Exceeds amount limit",
+            "domain": "BAS - Rules engine"
+          },
+          "62": {
+            "description": "Restricted card",
+            "domain": "C-Box && Auth Engine - Card or member check"
+          },
+          "63": {
+            "description": "Security violation (may also be a chargeback)",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "65": {
+            "description": "Exceeds withdrawal frequency limit",
+            "domain": "BAS - Rules engine"
+          },
+          "66": {
+            "description": "Card acceptor call acquirer security",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "67": {
+            "description": "Hard capture, pick-up",
+            "domain": "Auth Engine - Fraud Check service"
+          },
+          "75": {
+            "description": "Allowable number of PIN tries exceeded",
+            "domain": "NA"
+          },
+          "76": {
+            "description": "Key synchronization error",
+            "domain": "NI - MTI 0800 Key exchange"
+          },
+          "78": {
+            "description": "Customer not eligible for POS (Star)",
+            "domain": "Auth Engine - Member check"
+          },
+          "79": {
+            "description": "Invalid digital signature",
+            "domain": "Auth Engine, NI for MTI 0800 (\"Key exchange validation failed\")"
+          },
+          "80": {
+            "description": "Stale dated transaction (Star)",
+            "domain": "NI - Validation rule"
+          },
+          "81": {
+            "description": "Issuer requested standin",
+            "domain": "NI - Need to define the requirements with NB"
+          },
+          "89": {
+            "description": "Card verification value (CVC,CVV) failed verification (no pickup)",
+            "domain": "C-Box"
+          },
+          "90": {
+            "description": "Cutoff is in progress",
+            "domain": "Auth Engine - Health checks, NI - MTI 0800 for cut off"
+          },
+          "91": {
+            "description": "Issuer or switch is unavailable/inoperative",
+            "domain": "NI-  Cbox unavailable"
+          },
+          "92": {
+            "description": "Financial institution or intermediate network unknown for routing",
+            "domain": "NA"
+          },
+          "93": {
+            "description": "Transaction cannot be completed, violation of law",
+            "domain": "Auth Engine - Fraud check"
+          },
+          "94": {
+            "description": "Duplication transaction",
+            "domain": "NI - Duplicate check, also applicable for MTI 800"
+          },
+          "95": {
+            "description": "Reconcile error",
+            "domain": "Auth Engine"
+          },
+          "96": {
+            "description": "System malfunction",
+            "domain": "NI - communciation errors"
+          },
+          "N0": {
+            "description": "Authorization life cycle unacceptable",
+            "domain": "Auth Engine"
+          },
+          "N1": {
+            "description": "Authorization life cycle expired",
+            "domain": "Auth Engine"
+          },
+          "R2": {
+            "description": "Allowable PAN entries warning -- approved",
+            "domain": "NA"
+          },
+          "R3": {
+            "description": "Approved with overdraft protection",
+            "domain": "NA"
+          },
+          "R4": {
+            "description": "Bad CVC3/dCVV",
+            "domain": "C-Box - CNP txns"
+          },
+          "S0": {
+            "description": "Check not acceptable for cash",
+            "domain": "NA"
+          },
+          "S1": {
+            "description": "Check not acceptable",
+            "domain": "NA"
+          },
+          "S2": {
+            "description": "Check deposit limit exceeded",
+            "domain": "NA"
+          },
+          "S3": {
+            "description": "Cash back limit exceeded",
+            "domain": "NA"
+          },
+          "S4": {
+            "description": "Check amount does not match courtesy amount",
+            "domain": "NA"
+          },
+          "S5": {
+            "description": "PIN not selected",
+            "domain": "NA"
+          },
+          "S6": {
+            "description": "PIN already selected",
+            "domain": "NA"
+          },
+          "S7": {
+            "description": "Unmatched voucher information",
+            "domain": "BAS - Rules engine"
+          },
+          "S8": {
+            "description": "Allowable PAN entries exceeded -- denial",
+            "domain": "Auth Engine - Velocity checks"
+          },
+          "S9": {
+            "description": "Expiration date mismatch",
+            "domain": "C-Box"
+          },
+          "SA": {
+            "description": "Inactive card",
+            "domain": "C-Box"
+          },
+          "SB": {
+            "description": "Expiration date mismatch (card pickup)",
+            "domain": "C-Box"
+          },
+          "SC": {
+            "description": "Item suspected for stop pay",
+            "domain": "NA"
+          },
+          "SD": {
+            "description": "Account closed",
+            "domain": "Auth Engine - Member check"
+          },
+          "SE": {
+            "description": "Ineligible account",
+            "domain": "Auth Engine - Member check"
+          },
+          "SF": {
+            "description": "Item submitted more than two times",
+            "domain": "NA"
+          },
+          "SG": {
+            "description": "No account on file - absolute",
+            "domain": "NA"
+          },
+          "SH": {
+            "description": "Unable to locate",
+            "domain": "NA"
+          },
+          "SI": {
+            "description": "General denial",
+            "domain": "NA"
+          },
+          "SJ": {
+            "description": "Item settled via ACH",
+            "domain": "NA"
+          },
+          "SK": {
+            "description": "Cross-reference card not found",
+            "domain": "NA"
+          },
+          "SL": {
+            "description": "Category limit exceeded",
+            "domain": "BAS - Rules engine"
+          },
+          "SM": {
+            "description": "Transaction limit exceeded",
+            "domain": "BAS - Rules engine"
+          },
+          "SN": {
+            "description": "Daily limit exceeded",
+            "domain": "BAS - Rules engine"
+          },
+          "SO": {
+            "description": "Monthly limit exceeded",
+            "domain": "BAS - Rules engine"
+          },
+          "SP": {
+            "description": "Invalid secret code",
+            "domain": "NA"
+          },
+          "SQ": {
+            "description": "PIN key sync error",
+            "domain": "NA"
+          },
+          "SR": {
+            "description": "Bad CVC2/CVV2/CVx2",
+            "domain": "C-Box - CNP txns"
+          },
+          "SS": {
+            "description": "Stop payment order",
+            "domain": "Auth Engine"
+          },
+          "ST": {
+            "description": "Revocation of authorization order",
+            "domain": "NA"
+          },
+          "SV": {
+            "description": "Stop reoccurring payments",
+            "domain": "NA"
+          },
+          "T3": {
+            "description": "Lost card (no pickup)",
+            "domain": "C-Box"
+          },
+          "T4": {
+            "description": "Closed account",
+            "domain": "Auth Engine - Member check"
+          },
+          "T5": {
+            "description": "Dormant account",
+            "domain": "Auth Engine - Member check"
+          },
+          "T6": {
+            "description": "Special conditions (no pick-up)",
+            "domain": "NA"
+          },
+          "T7": {
+            "description": "Purchase-only approval for full purchase amount with cash back transaction.",
+            "domain": "NA"
+          },
+          "T9": {
+            "description": "Insufficient funds for fees",
+            "domain": "Auth Engine"
+          },
+          "TA": {
+            "description": "ARQC validation failed for chip card",
+            "domain": "C-Box - NA for current implementation"
+          },
+          "TB": {
+            "description": "Unsafe PIN",
+            "domain": "C-Box - NA for current implementation"
+          },
+          "TC": {
+            "description": "Additional customer authentication required",
+            "domain": "Auth Engine - NA for current implementation"
+          },
+          "TD": {
+            "description": "PIN required for additional security",
+            "domain": "C-Box - NA for current implementation"
+          },
+          "TH": {
+            "description": "Life cycle decline",
+            "domain": "Auth Engine"
+          },
+          "TI": {
+            "description": "Policy decline",
+            "domain": "BAS - Rules engine"
+          },
+          "TJ": {
+            "description": "Fraud/security decline",
+            "domain": "Auth Engine - Fraud check"
+          },
+          "TM": {
+            "description": "Valid account, but anticipated amount not available or not supported",
+            "domain": "Auth Engine - NA for current implementation"
+          }
+        }
+      }
     }
   },
   "40": {
@@ -1274,7 +1734,6 @@
             "2C": "AUTOMATIC_FUEL_DISPENSER",
             "3C": "AUTOMATIC_FUEL_DISPENSER",
             "2D": "CARD_AUTHENTICATION_METHOD_FAILURE",
-            "3D": "CARD_AUTHENTICATION_METHOD_FAILURE",
             "2E": "DEPOSIT_KEYING_ERROR",
             "2F": "DEPOSITED_ITEM_NON_NEGOTIABLE",
             "2G": "TRANSACTION_BLOCKING",

@@ -421,7 +421,7 @@ public class CreateIsoMessage  {
 
                     // Get the data from current row
                     Cell dataCell = dataRow.getCell(colNum);
-                    String cellValue = getCellValueAsString(dataCell).trim();
+                    String cellValue;
 
                     // Special handling for DE 60
                     if (colNum == 60) {
@@ -429,22 +429,7 @@ public class CreateIsoMessage  {
                     } else {
                         cellValue = getCellValueAsString(dataCell).trim();
                     }
-
-                    // Special handling for DE 11 (Column K)
-                    if (colNum == 10) {
-                        // Generate random 6-digit number
-                        String randomValue = String.format("%06d", new Random().nextInt(1000000));
-                        cellValue = randomValue;
-                        // Store for DE 37
-                        isoFields.put(11, randomValue);
-                    }
-
-                    // Special handling for DE 37 (Column AJ)
-                    if (colNum == 35) {
-                        // Get the stored DE 11 value and combine with prefix
-                        String de11Value = isoFields.getOrDefault(11, "000000");
-                        cellValue = "000001" + de11Value;
-                    }
+ 
 
                     if (cellValue.isEmpty()) {
                         continue;
@@ -519,10 +504,22 @@ public class CreateIsoMessage  {
                         // Write response code to column CN
                         Cell responseCell = dataRow.createCell(92); // Column CN
                         if (responseCode != null) {
-                            responseCell.setCellValue(responseCode);
-                         } else {
+                            JsonNode de39Config = fieldConfig.get("39");
+                            if (de39Config != null && de39Config.has("validation")) {
+                                JsonNode mapping = de39Config.get("validation").get("rules").get("mapping").get(responseCode);
+                                if (mapping != null) {
+                                    String description = mapping.get("description").asText();
+                                    String domain = mapping.get("domain").asText();
+                                    responseCell.setCellValue(String.format("%s - %s (%s)", responseCode, description, domain));
+                                } else {
+                                    responseCell.setCellValue(responseCode + " - Unknown response code");
+                                }
+                            } else {
+                                responseCell.setCellValue(responseCode);
+                            }
+                        } else {
                             responseCell.setCellValue("No DE39 found in response");
-                         }
+                        }
 
                     } catch (Exception e) {
                         System.out.println("\nWebSocket/Parser Error: " + e.getMessage());
