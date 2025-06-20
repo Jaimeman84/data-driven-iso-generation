@@ -868,13 +868,11 @@ public class CreateIsoMessage  {
      * Handles special validation cases for specific DEs based on config
      */
     private static boolean validateSpecialCase(String de, String expected, String actual, ValidationResult result) {
-        System.out.println("\nValidating special case for DE " + de);
         JsonNode config = fieldConfig.get(de);
         if (config != null && config.has("validation")) {
             JsonNode validation = config.get("validation");
             if (validation.has("type")) {
                 String validationType = validation.get("type").asText();
-                System.out.println("Found validation type: " + validationType);
                 switch (validationType) {
                     case "amount":
                         return validateAmount(de, expected, actual, result, validation.get("rules"));
@@ -904,33 +902,24 @@ public class CreateIsoMessage  {
                     case "pos_condition_code":
                         return validatePosConditionCode(de, expected, actual, result, validation.get("rules"));
                     case "additional_fees":
-                        System.out.println("Processing additional_fees validation for DE " + de);
                         return validateAdditionalFees(de, expected, actual, result, validation.get("rules"));
                     case "additional_amounts":
-                        System.out.println("Processing additional_amounts validation for DE " + de);
                         return validateAdditionalAmounts(de, expected, actual, result, validation.get("rules"));
                     case "national_pos_geographic_data":
-                        System.out.println("Processing national_pos_geographic_data validation for DE " + de);
                         return validateNationalPosGeographicData(de, expected, actual, result, validation.get("rules"));
                     case "network_data":
-                        System.out.println("Processing network_data validation for DE " + de);
                         return validateNetworkData(de, expected, actual, result, validation.get("rules"));
                     case "avs_data":
-                        System.out.println("Processing AVS data validation for DE " + de);
                         return validateAvsData(de, expected, actual, result, validation.get("rules"));
                     case "acquirer_trace_data":
-                        System.out.println("Processing acquirer trace data validation for DE " + de);
                         return validateAcquirerTraceData(de, expected, actual, result, validation.get("rules"));
                     case "issuer_trace_data":
-                        System.out.println("Processing issuer trace data validation for DE " + de);
                         return validateIssuerTraceData(de, expected, actual, result, validation.get("rules"));
                     case "incremental_auth_data":
-                        System.out.println("Processing incremental authorization data validation for DE " + de);
                         return validateIncrementalAuthData(de, expected, actual, result, validation.get("rules"));
                     case "advice_reversal_code":
                         return validateAdviceReversalCode(de, expected, actual, result, validation.get("rules"));
                     case "replacement_amounts":
-                        System.out.println("Processing replacement amounts validation for DE " + de);
                         return validateReplacementAmounts(de, expected, actual, result, validation.get("rules"));
                     default:
                         System.out.println("Unknown validation type: " + validationType);
