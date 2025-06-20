@@ -63,25 +63,22 @@ public class CreateIsoMessage  {
     }
 
     public static void loadConfig(String filename) throws IOException {
-
         String filepath = System.getProperty("user.dir");
         Path pathName;
 
-        if(System.getProperty("os.name").startsWith("Windows")) {
-            if(filename.contains("/")) {
-                filename=filename.split("/")[0]+"\\"+filename.split("/")[1];
+        if (System.getProperty("os.name").startsWith("Windows")) {
+            if (filename.contains("/")) {
+                filename = filename.split("/")[0] + "\\" + filename.split("/")[1];
             }
-            pathName =Path.of(filepath + "\\src\\test\\resources\\" + filename);
-        }
-        else {
-            if(filename.contains("/")) {
-                filename=filename.split("/")[0]+"/"+filename.split("/")[1];
+            pathName = Path.of(filepath + "\\src\\test\\resources\\" + filename);
+        } else {
+            if (filename.contains("/")) {
+                filename = filename.split("/")[0] + "/" + filename.split("/")[1];
             }
             pathName = Path.of(filepath + "/src/test/resources/" + filename);
         }
 
-
-        String s=Files.readString(pathName);
+        String s = Files.readString(pathName);
         JsonNode jsonNode = objectMapper.readTree(s);
         fieldConfig = new HashMap<>();
         for (Iterator<String> it = jsonNode.fieldNames(); it.hasNext(); ) {
@@ -92,9 +89,7 @@ public class CreateIsoMessage  {
 
     public static void generateDefaultFields() {
         // Ensure MTI defaults to "0100" if not manually set by the user
-
         if (!isoFields.containsKey(0) && !manuallyUpdatedFields.contains("MTI")) {
-
             isoFields.put(0, DEFAULT_MTI);
         }
 
@@ -103,7 +98,7 @@ public class CreateIsoMessage  {
             boolean active = config.get("active").asBoolean();
 
             if (active && !manuallyUpdatedFields.contains(field)) {
-                if(!field.contains("MTI")) {
+                if (!field.contains("MTI")) {
                     addField(field, generateRandomValue(config));
                 }
             }
@@ -125,7 +120,7 @@ public class CreateIsoMessage  {
 
         // Validate length & type (WARN, not stop execution)
         if (value.length() > maxLength) {
-            System.out.println("Warning: Value- "+value+"  for field " + fieldNumber + " exceeds max length " + maxLength + " (Truncated)");
+            System.out.println("Warning: Value- " + value + " for field " + fieldNumber + " exceeds max length " + maxLength + " (Truncated)");
             value = value.substring(0, maxLength);
         }
         if (!type.equalsIgnoreCase(dataType)) {
@@ -168,8 +163,6 @@ public class CreateIsoMessage  {
         }
     }
 
-
-
     private static String generateRandomValue(JsonNode config) {
         String type = config.get("type").asText();
         int maxLength = config.has("max_length") ? config.get("max_length").asInt() : config.get("length").asInt();
@@ -180,12 +173,7 @@ public class CreateIsoMessage  {
         StringBuilder message = new StringBuilder();
 
         // Ensure MTI is included, default to "0100" if not manually set
-        if (!isoFields.containsKey(0)) {
-            message.append(DEFAULT_MTI);
-        } else {
-//            System.out.println(isoFields.get(0));
-            message.append(isoFields.get(0));
-        }
+        message.append(isoFields.getOrDefault(0, DEFAULT_MTI));
 
         // Ensure bitmap is only generated if at least one field is present in DE 1-64
         boolean hasPrimaryFields = hasActivePrimaryFields();
@@ -211,12 +199,13 @@ public class CreateIsoMessage  {
             }
             message.append(isoFields.get(field));
         }
+
         return message.toString();
     }
 
     private static boolean hasActiveSecondaryFields() {
         for (int i = 0; i < 64; i++) {
-            if (secondaryBitmap[i] && isoFields.containsKey(i + 65)) {  // Check fields 65-128
+            if (secondaryBitmap[i] && isoFields.containsKey(i + 65)) { // Check fields 65-128
                 return true; // Secondary bitmap is required
             }
         }
@@ -228,11 +217,8 @@ public class CreateIsoMessage  {
 
         // Ensure MTI is correctly stored and printed
         if (!isoFields.containsKey(0) && !manuallyUpdatedFields.contains("MTI")) {
-
             outputJson.put("MTI", isoFields.getOrDefault(0, DEFAULT_MTI));
-        }
-        else{
-//            System.out.println(isoFields.get(0));
+        } else {
             outputJson.put("MTI", isoFields.get(0));
         }
 
@@ -245,6 +231,7 @@ public class CreateIsoMessage  {
         if (hasActiveSecondaryFields()) {
             outputJson.put("SecondaryBitmap", bitmapToHex(secondaryBitmap));
         }
+
         // Loop through all fields except MTI (Field_0)
         for (int field : isoFields.keySet()) {
             if (field == 0) continue; // Skip MTI from being printed as Field_0
@@ -270,18 +257,14 @@ public class CreateIsoMessage  {
     }
 
     public static String getFieldNumberFromJsonPath(String jsonPath) {
-
         return fieldConfig.entrySet().stream()
-                .filter(entry -> {
-                    JsonNode nameNode = entry.getValue().get("name");
-                    return nameNode != null && jsonPath.equals(nameNode.asText());
-                })
-                .findFirst()
-                .map(entry -> {
-//                    System.out.println("Match found - Key: " + entry.getKey() + ", JSONPath: " + jsonPath);
-                    return entry.getKey();
-                })
-                .orElse(null);
+            .filter(entry -> {
+                JsonNode nameNode = entry.getValue().get("name");
+                return nameNode != null && jsonPath.equals(nameNode.asText());
+            })
+            .findFirst()
+            .map(Map.Entry::getKey)
+            .orElse(null);
     }
 
     private static String bitmapToHex(boolean[] bitmap) {
@@ -295,7 +278,6 @@ public class CreateIsoMessage  {
         for (int i = 0; i < 64; i += 4) {
             hex.append(Integer.toHexString(Integer.parseInt(binary.substring(i, i + 4), 2)).toUpperCase());
         }
-
         return hex.toString();
     }
 
@@ -340,18 +322,22 @@ public class CreateIsoMessage  {
             case BOOLEAN:
                 return String.valueOf(cell.getBooleanCellValue());
             case FORMULA:
-                if (cell.getCachedFormulaResultType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
-                Date date = cell.getDateCellValue();
-                SimpleDateFormat sdf;
-                
-                if (cell.getColumnIndex() == 6) {  // DE 7 Transaction Date/Time
-                    sdf = new SimpleDateFormat("MMddHHmmss");
-                } else {
-                    sdf = new SimpleDateFormat("MMdd");
+                if (cell.getColumnIndex() == 10) { // DE 11 System Trace Audit Number
+                    return String.format("%06d", (int) cell.getNumericCellValue());
                 }
-                
-                return sdf.format(date);
-            }
+                if (cell.getColumnIndex() == 35) { // DE 37 Retrieval Reference Number
+                    return cell.getStringCellValue();
+                }
+                if (cell.getCachedFormulaResultType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+                    Date date = cell.getDateCellValue();
+                    SimpleDateFormat sdf;
+                    if (cell.getColumnIndex() == 6) { // DE 7 Transaction Date/Time
+                        sdf = new SimpleDateFormat("MMddHHmmss");
+                    } else {
+                        sdf = new SimpleDateFormat("MMdd");
+                    }
+                    return sdf.format(date);
+                }
             default:
                 return "";
         }
@@ -392,6 +378,8 @@ public class CreateIsoMessage  {
             isoHeaderCell.setCellValue("Generated ISO Message");
             Cell validationHeaderCell = headerRow.createCell(90); // Column CM
             validationHeaderCell.setCellValue("Validation Results");
+            Cell de39HeaderCell = headerRow.createCell(91); // Column CN
+            de39HeaderCell.setCellValue("DE39 Response Code");
 
             // Process each row starting from row 6
             for (int rowIndex = 5; rowIndex <= totalRows; rowIndex++) {
@@ -410,6 +398,7 @@ public class CreateIsoMessage  {
                 Arrays.fill(secondaryBitmap, false);
 
                 int processedFields = 0;
+
                 // Start from Column B (index 1) and go to Column CK (index 88)
                 for (int colNum = 1; colNum <= 88; colNum++) {
                     // Get the Data Element Key from Row 1
@@ -425,11 +414,10 @@ public class CreateIsoMessage  {
 
                     // Special handling for DE 60
                     if (colNum == 60) {
-                        cellValue = getCellValueAsString(getCell);
+                        cellValue = getCellValueAsString(dataCell);
                     } else {
                         cellValue = getCellValueAsString(dataCell).trim();
                     }
- 
 
                     if (cellValue.isEmpty()) {
                         continue;
@@ -444,11 +432,11 @@ public class CreateIsoMessage  {
 
                     try {
                         // Get the field name from configuration
-                        String fieldName = "";
+                        String fieldName;
                         if (config != null && config.has("name")) {
                             fieldName = config.get("name").asText();
                         } else {
-                            System.out.println("  Warning: No field name found in configuration for key " + dataElementKey);
+                            System.out.println(" Warning: No field name found in configuration for key " + dataElementKey);
                             fieldName = "Field_" + dataElementKey; // Fallback
                         }
 
@@ -456,7 +444,7 @@ public class CreateIsoMessage  {
                         applyBddUpdate(fieldName, cellValue, dataType);
                         processedFields++;
                     } catch (Exception e) {
-                        System.out.println("  Status: Failed to process - " + e.getMessage());
+                        System.out.println(" Status: Failed to process - " + e.getMessage());
                     }
                 }
 
@@ -475,15 +463,15 @@ public class CreateIsoMessage  {
                     messageCell.setCellValue(isoMessage);
 
                     try {
-                        WebSocketManager.init(PARSER_URL);
+                        WebSocketManager.init(WS_URL);
                         WebSocketManager.sendMessage(isoMessage);
                         String wsResponse = WebSocketClient.getResponseMessage();
                         WebSocketManager.close();
 
                         // Parse response to get DE39
-                        String parsedResponse = sendIsoMessageToParser(wsResponse);                       
+                        String parsedResponse = sendIsoMessageToParser(wsResponse);
                         JsonNode responseArray = objectMapper.readTree(parsedResponse);
-                        
+
                         // Extract DE39 (Response Code) from array
                         String responseCode = null;
                         if (responseArray.isArray()) {
@@ -491,18 +479,16 @@ public class CreateIsoMessage  {
                             for (int i = 0; i < responseArray.size(); i++) {
                                 JsonNode element = responseArray.get(i);
                                 String elementId = element.get("dataElementId").asText();
-                                System.out.println("Checking element " + i + " with ID: " + elementId); // Debug print
-                                
                                 if ("39".equals(elementId)) {
                                     responseCode = element.get("value").asText();
-                                    System.out.println("Found DE39 with value: " + responseCode); // Debug print
+                                    System.out.println("Found DE39 with value: " + responseCode);
                                     break;
                                 }
                             }
                         }
 
                         // Write response code to column CN
-                        Cell responseCell = dataRow.createCell(92); // Column CN
+                        Cell responseCell = dataRow.createCell(91); // Column CN
                         if (responseCode != null) {
                             JsonNode de39Config = fieldConfig.get("39");
                             if (de39Config != null && de39Config.has("validation")) {
@@ -520,7 +506,6 @@ public class CreateIsoMessage  {
                         } else {
                             responseCell.setCellValue("No DE39 found in response");
                         }
-
                     } catch (Exception e) {
                         System.out.println("\nWebSocket/Parser Error: " + e.getMessage());
                         e.printStackTrace(); // Print full stack trace for debugging
@@ -539,30 +524,33 @@ public class CreateIsoMessage  {
                         // Write validation results to the spreadsheet
                         Cell validationCell = dataRow.createCell(90); // Column CM
                         long passCount = validationResult.getResults().values().stream()
-                                .filter(r -> r.getStatus() == FieldStatus.PASSED).count();
+                            .filter(r -> r.getStatus() == FieldStatus.PASSED)
+                            .count();
                         long failCount = validationResult.getResults().values().stream()
-                                .filter(r -> r.getStatus() == FieldStatus.FAILED).count();
+                            .filter(r -> r.getStatus() == FieldStatus.FAILED)
+                            .count();
                         long skipCount = validationResult.getResults().values().stream()
-                                .filter(r -> r.getStatus() == FieldStatus.SKIPPED).count();
+                            .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
+                            .count();
 
                         // Get failed and skipped DEs
                         String failedDEs = validationResult.getResults().entrySet().stream()
-                                .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
-                                .map(Map.Entry::getKey)
-                                .collect(Collectors.joining(", "));
+                            .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
+                            .map(Map.Entry::getKey)
+                            .collect(Collectors.joining(", "));
                         String skippedDEs = validationResult.getResults().entrySet().stream()
-                                .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
-                                .map(Map.Entry::getKey)
-                                .collect(Collectors.joining(", "));
+                            .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                            .map(Map.Entry::getKey)
+                            .collect(Collectors.joining(", "));
 
                         String validationSummary = String.format(
-                                "Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
-                                validationResult.getResults().size(),
-                                passCount,
-                                failCount,
-                                failCount > 0 ? " (DE " + failedDEs + ")" : "",
-                                skipCount,
-                                skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
+                            "Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
+                            validationResult.getResults().size(),
+                            passCount,
+                            failCount,
+                            failCount > 0 ? " (DE " + failedDEs + ")" : "",
+                            skipCount,
+                            skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
                         );
                         validationCell.setCellValue(validationSummary);
                     } catch (Exception e) {
@@ -585,17 +573,6 @@ public class CreateIsoMessage  {
             e.printStackTrace();
             throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
         }
-    }
-
-    // Helper method to convert column index to column name (e.g., 0=A, 1=B, etc.)
-    private static String getColumnName(int colNum) {
-        StringBuilder columnName = new StringBuilder();
-        while (colNum >= 0) {
-            int remainder = colNum % 26;
-            columnName.insert(0, (char)('A' + remainder));
-            colNum = (colNum / 26) - 1;
-        }
-        return columnName.toString();
     }
 
     public static String sendIsoMessageToParser(String isoMessage) throws IOException {
@@ -1076,7 +1053,7 @@ public class CreateIsoMessage  {
             String actualPseudoTerminal = getJsonValue(actualJson, "transaction.Network.pseudoTerminal");
             if (!expectedPseudoTerminal.equals(actualPseudoTerminal)) {
                 details.append("Pseudo Terminal mismatch: expected ").append(expectedPseudoTerminal)
-                      .append(", got ").append(actualPseudoTerminal).append("; ");
+                    .append(", got ").append(actualPseudoTerminal).append("; ");
                 allValid = false;
             }
 
@@ -1085,7 +1062,7 @@ public class CreateIsoMessage  {
             String actualNetworkId = getJsonValue(actualJson, "transaction.Network.acquirerNetworkId");
             if (!expectedNetworkId.equals(actualNetworkId)) {
                 details.append("Acquirer Network ID mismatch: expected ").append(expectedNetworkId)
-                      .append(", got ").append(actualNetworkId).append("; ");
+                    .append(", got ").append(actualNetworkId).append("; ");
                 allValid = false;
             }
 
@@ -1094,7 +1071,7 @@ public class CreateIsoMessage  {
             String actualProcessorId = getJsonValue(actualJson, "transaction.Network.processorId");
             if (!expectedProcessorId.equals(actualProcessorId)) {
                 details.append("Processor ID mismatch: expected ").append(expectedProcessorId)
-                      .append(", got ").append(actualProcessorId).append("; ");
+                    .append(", got ").append(actualProcessorId).append("; ");
                 allValid = false;
             }
 
@@ -1104,7 +1081,7 @@ public class CreateIsoMessage  {
             String actualSettlement = getJsonValue(actualJson, "transaction.Network.ProcessingFlag.isExternallySettled");
             if (!expectedSettlement.equals(actualSettlement)) {
                 details.append("Settlement flag mismatch: expected ").append(expectedSettlement)
-                      .append(", got ").append(actualSettlement).append("; ");
+                    .append(", got ").append(actualSettlement).append("; ");
                 allValid = false;
             }
 
@@ -1124,16 +1101,15 @@ public class CreateIsoMessage  {
             String actualPartialAuth = getJsonValue(actualJson, "transaction.Network.ProcessingFlag.partialAuthTerminalSupportIndicator");
             if (!expectedPartialAuth.equals(actualPartialAuth)) {
                 details.append("Partial Auth Support mismatch: expected ").append(expectedPartialAuth)
-                      .append(", got ").append(actualPartialAuth);
+                    .append(", got ").append(actualPartialAuth);
                 allValid = false;
             }
 
             if (allValid) {
                 result.addPassedField(de, expected, actual);
             } else {
-                result.addFailedField(de, expected, actual + " [" + details.toString() + "]");
+                result.addFailedField(de, expected, actual + " [" + details + "]");
             }
-
             return true;
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to parse network data: " + e.getMessage());
@@ -1171,20 +1147,18 @@ public class CreateIsoMessage  {
             // For DEs 28-31, also validate debit/credit indicator
             if (amountMatches && !debitCreditIndicator.isEmpty() && rules.has("debitCreditIndicator")) {
                 String expectedIndicatorType = rules.get("debitCreditIndicator")
-                        .get(debitCreditIndicator).asText();
+                    .get(debitCreditIndicator).asText();
 
                 // Get the debitCreditIndicatorType from canonical response
                 String actualIndicatorType = getJsonValue(actualJson, getCanonicalPaths(de).get(1));
 
                 if (expectedIndicatorType.equals(actualIndicatorType)) {
-                    result.addPassedField(de, expected,
-                            String.format("%s (Amount: %s, Type: %s)",
-                                    actualValue, normalizedActual, actualIndicatorType));
+                    result.addPassedField(de, expected, String.format("%s (Amount: %s, Type: %s)",
+                        actualValue, normalizedActual, actualIndicatorType));
                     return true;
                 } else {
-                    result.addFailedField(de, expected,
-                            String.format("%s (Amount matches but expected type %s, got %s)",
-                                    actualValue, expectedIndicatorType, actualIndicatorType));
+                    result.addFailedField(de, expected, String.format("%s (Amount matches but expected type %s, got %s)",
+                        actualValue, expectedIndicatorType, actualIndicatorType));
                     return false;
                 }
             }
@@ -1196,10 +1170,8 @@ public class CreateIsoMessage  {
 
             result.addFailedField(de, expected, actualValue);
             return false;
-
         } catch (Exception e) {
-            result.addFailedField(de, expected,
-                    "Failed to validate amount: " + e.getMessage());
+            result.addFailedField(de, expected, "Failed to validate amount: " + e.getMessage());
             return false;
         }
     }
@@ -1221,9 +1193,8 @@ public class CreateIsoMessage  {
                 // Get the other field's value from the ISO message
                 String otherValue = isoFields.get(Integer.parseInt(otherField));
                 if (otherValue == null) {
-                    result.addFailedField(de, expected,
-                            String.format("Paired field DE %s not found - both DE %s and DE %s are needed for datetime validation",
-                                    otherField, de, otherField));
+                    result.addFailedField(de, expected, String.format("Paired field DE %s not found - both DE %s and DE %s are needed for datetime validation",
+                        otherField, de, otherField));
                     return false;
                 }
 
@@ -1239,15 +1210,11 @@ public class CreateIsoMessage  {
             // Regular datetime validation for non-paired fields
             return validateSingleDateTime(de, expected, actual, result);
         } catch (Exception e) {
-            result.addFailedField(de, expected,
-                    actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+            result.addFailedField(de, expected, actual + " (Failed to parse datetime: " + e.getMessage() + ")");
             return false;
         }
     }
 
-    /**
-     * Validates paired datetime fields (DE 12 + DE 13)
-     */
     private static boolean validatePairedDateTime(String de1, String de2, String combinedValue, String actual, ValidationResult result) {
         try {
             // Parse the combined MMDD + hhmmss format
@@ -1261,37 +1228,30 @@ public class CreateIsoMessage  {
             int year = Calendar.getInstance().get(Calendar.YEAR);
 
             // Create expected datetime string
-            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
-                    year, month, day, hour, minute, second);
+            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s", year, month, day, hour, minute, second);
 
             // Compare ignoring timezone
             if (actual.startsWith(expectedDateTime)) {
                 // Add success result for both fields
-                String successMessage = String.format("%s (Validated with DE %s and DE %s)",
-                        actual, de1, de2);
+                String successMessage = String.format("%s (Validated with DE %s and DE %s)", actual, de1, de2);
                 result.addPassedField(de1, combinedValue, successMessage);
                 result.addPassedField(de2, combinedValue, successMessage);
                 return true;
             }
 
             // Add failure result for both fields
-            String failureMessage = String.format("%s (Expected format: %s from DE %s and DE %s)",
-                    actual, expectedDateTime, de1, de2);
+            String failureMessage = String.format("%s (Expected format: %s from DE %s and DE %s)", actual, expectedDateTime, de1, de2);
             result.addFailedField(de1, combinedValue, failureMessage);
             result.addFailedField(de2, combinedValue, failureMessage);
             return false;
         } catch (Exception e) {
-            String errorMessage = String.format("%s (Failed to parse paired datetime from DE %s and DE %s: %s)",
-                    actual, de1, de2, e.getMessage());
+            String errorMessage = String.format("%s (Failed to parse paired datetime from DE %s and DE %s: %s)", actual, de1, de2, e.getMessage());
             result.addFailedField(de1, combinedValue, errorMessage);
             result.addFailedField(de2, combinedValue, errorMessage);
             return false;
         }
     }
 
-    /**
-     * Validates a single datetime field (like DE 7)
-     */
     private static boolean validateSingleDateTime(String de, String expected, String actual, ValidationResult result) {
         try {
             // Parse the expected MMDDhhmmss format
@@ -1305,8 +1265,7 @@ public class CreateIsoMessage  {
             int year = Calendar.getInstance().get(Calendar.YEAR);
 
             // Create expected datetime string
-            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
-                    year, month, day, hour, minute, second);
+            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s", year, month, day, hour, minute, second);
 
             // Compare ignoring timezone
             if (actual.startsWith(expectedDateTime)) {
@@ -1314,12 +1273,10 @@ public class CreateIsoMessage  {
                 return true;
             }
 
-            result.addFailedField(de, expected +
-                    String.format(" (Expected format: %s)", expectedDateTime), actual);
+            result.addFailedField(de, expected + String.format(" (Expected format: %s)", expectedDateTime), actual);
             return false;
         } catch (Exception e) {
-            result.addFailedField(de, expected,
-                    actual + " (Failed to parse datetime: " + e.getMessage() + ")");
+            result.addFailedField(de, expected, actual + " (Failed to parse datetime: " + e.getMessage() + ")");
             return false;
         }
     }
@@ -1335,7 +1292,6 @@ public class CreateIsoMessage  {
 
             // For currency code, just compare the numeric values directly
             String normalizedExpected = expected.replaceFirst("^0+", ""); // Remove leading zeros
-
             if (normalizedExpected.equals(actualValue)) {
                 result.addPassedField(de, expected, actualValue);
                 return true;
@@ -1343,10 +1299,8 @@ public class CreateIsoMessage  {
 
             result.addFailedField(de, expected, actualValue);
             return false;
-
         } catch (Exception e) {
-            result.addFailedField(de, expected,
-                    "Failed to validate currency: " + e.getMessage());
+            result.addFailedField(de, expected, "Failed to validate currency: " + e.getMessage());
             return false;
         }
     }
@@ -1379,19 +1333,17 @@ public class CreateIsoMessage  {
             boolean allMatch = addressMatch && cityMatch && stateMatch && countryMatch;
 
             // Just show the canonical values
-            String canonicalValue = String.format("%s, %s, %s %s",
-                    actualAddress, actualCity, actualState, actualCountry);
+            String canonicalValue = String.format("%s, %s, %s %s", actualAddress, actualCity, actualState, actualCountry);
 
             if (allMatch) {
                 result.addPassedField(de, expected, canonicalValue);
             } else {
                 result.addFailedField(de, expected, canonicalValue);
             }
-            return allMatch;
 
+            return allMatch;
         } catch (Exception e) {
-            result.addFailedField(de, expected,
-                    "Failed to validate merchant location: " + e.getMessage());
+            result.addFailedField(de, expected, "Failed to validate merchant location: " + e.getMessage());
             return false;
         }
     }
@@ -1516,8 +1468,7 @@ public class CreateIsoMessage  {
 
         public void printResults() {
             System.out.println("\n=== Validation Results ===");
-            System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
-                    "DE", "Status", "ISO Value", "Canonical Value", "Mapping"));
+            System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n", "DE", "Status", "ISO Value", "Canonical Value", "Mapping");
             System.out.println("-".repeat(120));
 
             // Create a sorted map with custom comparator for numeric DE sorting
@@ -1525,7 +1476,7 @@ public class CreateIsoMessage  {
                 // Handle MTI specially
                 if (de1.equals("MTI")) return -1;
                 if (de2.equals("MTI")) return 1;
-                
+
                 // Convert DEs to integers for numeric comparison
                 try {
                     int num1 = Integer.parseInt(de1);
@@ -1568,50 +1519,48 @@ public class CreateIsoMessage  {
                     // Format canonical value with any relevant conversion info
                     String canonicalValue = formatCanonicalValue(de, result);
 
-                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
-                            de,
-                            result.getStatus().toString(),
-                            truncateOrPad(isoValue, 40),
-                            truncateOrPad(canonicalValue, 40),
-                            canonicalPath
-                    ));
+                    System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n",
+                        de,
+                        result.getStatus().toString(),
+                        truncateOrPad(isoValue, 40),
+                        truncateOrPad(canonicalValue, 40),
+                        canonicalPath
+                    );
                 } catch (Exception e) {
                     // If there's an error formatting a specific row, print it with error info
-                    System.out.println(String.format("%-6s | %-15s | %-40s | %-40s | %s",
-                            de,
-                            "ERROR",
-                            "Error formatting result",
-                            e.getMessage(),
-                            "Error"
-                    ));
+                    System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n",
+                        de,
+                        "ERROR",
+                        "Error formatting result",
+                        e.getMessage(),
+                        "Error"
+                    );
                 }
             });
 
             // Print summary
             long passCount = results.values().stream()
-                    .filter(r -> r.getStatus() == FieldStatus.PASSED)
-                    .count();
+                .filter(r -> r.getStatus() == FieldStatus.PASSED)
+                .count();
             long failCount = results.values().stream()
-                    .filter(r -> r.getStatus() == FieldStatus.FAILED)
-                    .count();
+                .filter(r -> r.getStatus() == FieldStatus.FAILED)
+                .count();
             long skipCount = results.values().stream()
-                    .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
-                    .count();
+                .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
+                .count();
 
             System.out.println("\nSummary:");
             System.out.println("Total Fields: " + results.size());
             System.out.println("Passed: " + passCount);
             System.out.println("Failed: " + failCount);
-            System.out.println("Skipped: " + skipCount +
-                    (skipCount > 0 ? " (Fields not canonicalized or requiring special handling)" : ""));
+            System.out.println("Skipped: " + skipCount + (skipCount > 0 ? " (Fields not canonicalized or requiring special handling)" : ""));
 
             // If there are skipped fields, show them and their reasons
             if (skipCount > 0) {
                 System.out.println("\nSkipped Fields:");
                 results.entrySet().stream()
-                        .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
-                        .forEach(e -> System.out.println(String.format("DE %s: %s",
-                                e.getKey(), e.getValue().getActual())));
+                    .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                    .forEach(e -> System.out.printf("DE %s: %s%n", e.getKey(), e.getValue().getActual()));
             }
         }
 
@@ -1623,7 +1572,6 @@ public class CreateIsoMessage  {
             JsonNode config = fieldConfig.get(de);
             if (config != null && config.has("validation")) {
                 JsonNode validation = config.get("validation");
-
                 try {
                     // For paired datetime fields
                     if (validation.has("format") && validation.get("format").has("pairedField")) {
@@ -1813,7 +1761,7 @@ public class CreateIsoMessage  {
             String actualType = getJsonValue(actualJson, "transaction.originalTransaction.transactionType");
             boolean messageTypeValid = expectedType.equals(actualType);
             validationDetails.append(String.format("Message Type: %s->%s (%s), ",
-                    messageType, expectedType, messageTypeValid ? "✓" : "✗"));
+                messageType, expectedType, messageTypeValid ? "✓" : "✗"));
             allValid &= messageTypeValid;
 
             // Validate System Trace Audit Number (positions 5-10)
@@ -1821,13 +1769,13 @@ public class CreateIsoMessage  {
             String actualStan = getJsonValue(actualJson, "transaction.originalTransaction.systemTraceAuditNumber");
             boolean stanValid = stan.equals(actualStan);
             validationDetails.append(String.format("STAN: %s (%s), ",
-                    stan, stanValid ? "✓" : "✗"));
+                stan, stanValid ? "✓" : "✗"));
             allValid &= stanValid;
 
             // Validate Transmission Date Time (positions 11-20)
             String dateTime = expected.substring(10, 20);
             String actualDateTime = getJsonValue(actualJson, "transaction.originalTransaction.transmissionDateTime");
-            
+
             // Parse the expected date time (MMDDhhmmss format)
             String month = dateTime.substring(0, 2);
             String day = dateTime.substring(2, 4);
@@ -1839,13 +1787,12 @@ public class CreateIsoMessage  {
             int year = Calendar.getInstance().get(Calendar.YEAR);
 
             // Create expected datetime string in UTC format
-            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s",
-                    year, month, day, hour, minute, second);
+            String expectedDateTime = String.format("%d-%s-%sT%s:%s:%s", year, month, day, hour, minute, second);
 
             // Compare ignoring timezone and any additional precision
             boolean dateTimeValid = actualDateTime.startsWith(expectedDateTime);
             validationDetails.append(String.format("DateTime: %s->%s (%s), ",
-                    dateTime, actualDateTime, dateTimeValid ? "✓" : "✗"));
+                dateTime, actualDateTime, dateTimeValid ? "✓" : "✗"));
             allValid &= dateTimeValid;
 
             // Validate Acquirer ID (positions 21-31)
@@ -1853,7 +1800,7 @@ public class CreateIsoMessage  {
             String actualAcquirerId = getJsonValue(actualJson, "transaction.originalTransaction.acquirer.acquirerId");
             boolean acquirerIdValid = acquirerId.equals(actualAcquirerId);
             validationDetails.append(String.format("AcquirerID: %s (%s), ",
-                    acquirerId, acquirerIdValid ? "✓" : "✗"));
+                acquirerId, acquirerIdValid ? "✓" : "✗"));
             allValid &= acquirerIdValid;
 
             // Validate Forwarding Institution ID (positions 32-42)
@@ -1861,7 +1808,7 @@ public class CreateIsoMessage  {
             String actualForwardingId = getJsonValue(actualJson, "transaction.originalTransaction.forwardingInstitution.forwardingInstitutionId");
             boolean forwardingIdValid = forwardingId.equals(actualForwardingId);
             validationDetails.append(String.format("ForwardingID: %s (%s)",
-                    forwardingId, forwardingIdValid ? "✓" : "✗"));
+                forwardingId, forwardingIdValid ? "✓" : "✗"));
             allValid &= forwardingIdValid;
 
             // Add validation result with detailed breakdown
@@ -1870,11 +1817,10 @@ public class CreateIsoMessage  {
             } else {
                 result.addFailedField(de, expected, validationDetails.toString());
             }
-            return allValid;
 
+            return allValid;
         } catch (Exception e) {
-            result.addFailedField(de, expected,
-                    "Failed to validate original data elements: " + e.getMessage());
+            result.addFailedField(de, expected, "Failed to validate original data elements: " + e.getMessage());
             return false;
         }
     }
