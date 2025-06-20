@@ -35,7 +35,7 @@ public class CreateIsoMessage  {
     private static final String CANONICAL_URL = "enter url here"; // Replace with actual URL
     private static final String WS_URL = "ws://localhost:8080/ws"; // Replace with actual URL
 
-     public void i_create_iso_message(String requestName, DataTable dt) throws IOException {
+     public void createIsoMessage(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
 
         List<Map<String, String>> rows = dt.asMaps(String.class, String.class);
