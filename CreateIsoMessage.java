@@ -281,6 +281,21 @@ public class CreateIsoMessage  {
         return hex.toString();
     }
 
+    /**
+     * Converts a hexadecimal string to its binary representation
+     * @param hex The hexadecimal string to convert
+     * @return The binary string representation
+     */
+    private static String hexToBinary(String hex) {
+        StringBuilder binary = new StringBuilder();
+        for (int i = 0; i < hex.length(); i++) {
+            String bin = String.format("%4s", Integer.toBinaryString(Integer.parseInt(hex.substring(i, i + 1), 16)))
+                    .replace(' ', '0');
+            binary.append(bin);
+        }
+        return binary.toString();
+    }
+
     private static boolean hasActivePrimaryFields() {
         for (int i = 0; i < 64; i++) {
             if (primaryBitmap[i] && isoFields.containsKey(i + 1)) { // Check fields 1-64
@@ -2874,6 +2889,208 @@ public class CreateIsoMessage  {
 
         } catch (Exception e) {
             result.addFailedField(de, expected, "Failed to validate replacement amounts: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Validates DE 111 (Additional Data) based on format identifier MC or MD
+     * @param de The data element number (111)
+     * @param expected The expected DE 111 value
+     * @param actual The actual canonical JSON response
+     * @param result The validation result object
+     * @return true if validation passes, false otherwise
+     */
+    private static boolean validateAdditionalData(String de, String expected, String actual, ValidationResult result) {
+        try {
+            JsonNode actualJson = objectMapper.readTree(actual);
+            StringBuilder details = new StringBuilder();
+            boolean allValid = true;
+
+            // Extract format identifier (positions 1-2)
+            String formatIdentifier = expected.substring(0, 2);
+            String actualFormatIdentifier = getJsonValue(actualJson, "transaction.additionalData.formatIdentifier");
+            if (!formatIdentifier.equals(actualFormatIdentifier)) {
+                details.append("Format identifier mismatch: expected ").append(formatIdentifier)
+                      .append(", got ").append(actualFormatIdentifier).append("; ");
+                allValid = false;
+            }
+
+            // Extract and convert primary bitmap (positions 6-13) to binary
+            String primaryBitmapHex = expected.substring(5, 13);
+            String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
+
+            // Current position in the input string
+            int currentPos = 13;
+
+            if (formatIdentifier.equals("MC")) {
+                // Process MC format fields
+                if (primaryBitmapBinary.charAt(5) == '1') { // Bit 6 - zipCode
+                    String zipCode = expected.substring(currentPos, currentPos + 10);
+                    String actualZipCode = getJsonValue(actualJson, "transaction.additionalData.address.zipCode");
+                    if (!zipCode.equals(actualZipCode)) {
+                        details.append("Zip code mismatch: expected ").append(zipCode)
+                              .append(", got ").append(actualZipCode).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 10;
+                }
+
+                if (primaryBitmapBinary.charAt(6) == '1') { // Bit 7 - isCnp
+                    String isCnp = expected.substring(currentPos, currentPos + 1);
+                    boolean actualIsCnp = actualJson.at("/transaction/additionalData/isCnp").asBoolean();
+                    if (("1".equals(isCnp) && !actualIsCnp) || ("0".equals(isCnp) && actualIsCnp)) {
+                        details.append("CNP indicator mismatch: expected ").append(isCnp)
+                              .append(", got ").append(actualIsCnp).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 1;
+                }
+
+                if (primaryBitmapBinary.charAt(8) == '1') { // Bit 9 - mcAssignedId
+                    String mcAssignedId = expected.substring(currentPos, currentPos + 6);
+                    String actualMcAssignedId = getJsonValue(actualJson, "transaction.additionalData.mcAssignedId");
+                    if (!mcAssignedId.equals(actualMcAssignedId)) {
+                        details.append("MC Assigned ID mismatch: expected ").append(mcAssignedId)
+                              .append(", got ").append(actualMcAssignedId).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 6;
+                }
+
+                if (primaryBitmapBinary.charAt(18) == '1') { // Bit 19 - incrementalAuthIndicator
+                    String incrementalAuthIndicator = expected.substring(currentPos, currentPos + 1);
+                    String actualIncrementalAuthIndicator = getJsonValue(actualJson, "transaction.additionalData.incrementalAuthIndicator");
+                    if (!actualIncrementalAuthIndicator.startsWith(incrementalAuthIndicator)) {
+                        details.append("Incremental auth indicator mismatch: expected ").append(incrementalAuthIndicator)
+                              .append(", got ").append(actualIncrementalAuthIndicator).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 1;
+                }
+
+                if (primaryBitmapBinary.charAt(25) == '1') { // Bit 26 - finalAuthIndicator
+                    String finalAuthIndicator = expected.substring(currentPos, currentPos + 1);
+                    String actualFinalAuthIndicator = getJsonValue(actualJson, "transaction.additionalData.finalAuthIndicator");
+                    if (!finalAuthIndicator.equals(actualFinalAuthIndicator)) {
+                        details.append("Final auth indicator mismatch: expected ").append(finalAuthIndicator)
+                              .append(", got ").append(actualFinalAuthIndicator).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 1;
+                }
+
+                // Check if secondary bitmap is present (bit 32)
+                if (primaryBitmapBinary.charAt(31) == '1') {
+                    String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
+                    String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+                    currentPos += 8;
+
+                    if (secondaryBitmapBinary.charAt(15) == '1') { // Bit 16 - linkedTransactionId
+                        String linkedTransactionId = expected.substring(currentPos, currentPos + 22);
+                        String actualLinkedTransactionId = getJsonValue(actualJson, "transaction.additionalData.linkedTransactionId");
+                        if (!linkedTransactionId.equals(actualLinkedTransactionId)) {
+                            details.append("Linked transaction ID mismatch: expected ").append(linkedTransactionId)
+                                  .append(", got ").append(actualLinkedTransactionId).append("; ");
+                            allValid = false;
+                        }
+                    }
+                }
+            } else if (formatIdentifier.equals("MD")) {
+                // Process MD format fields
+                if (primaryBitmapBinary.charAt(0) == '1') { // Bit 1 - mcAssignedId
+                    String mcAssignedId = expected.substring(currentPos, currentPos + 6);
+                    String actualMcAssignedId = getJsonValue(actualJson, "transaction.additionalData.mcAssignedId");
+                    if (!mcAssignedId.equals(actualMcAssignedId)) {
+                        details.append("MC Assigned ID mismatch: expected ").append(mcAssignedId)
+                              .append(", got ").append(actualMcAssignedId).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 6;
+                }
+
+                if (primaryBitmapBinary.charAt(4) == '1') { // Bit 5 - isCnp
+                    String isCnp = expected.substring(currentPos, currentPos + 1);
+                    boolean actualIsCnp = actualJson.at("/transaction/additionalData/isCnp").asBoolean();
+                    if (("1".equals(isCnp) && !actualIsCnp) || ("0".equals(isCnp) && actualIsCnp)) {
+                        details.append("CNP indicator mismatch: expected ").append(isCnp)
+                              .append(", got ").append(actualIsCnp).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 1;
+                }
+
+                if (primaryBitmapBinary.charAt(5) == '1') { // Bit 6 - operatingEnvironment
+                    String operatingEnvironment = expected.substring(currentPos, currentPos + 1);
+                    String actualOperatingEnvironment = getJsonValue(actualJson, "transaction.additionalData.operatingEnvironment");
+                    if (!operatingEnvironment.equals(actualOperatingEnvironment)) {
+                        details.append("Operating environment mismatch: expected ").append(operatingEnvironment)
+                              .append(", got ").append(actualOperatingEnvironment).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 1;
+                }
+
+                if (primaryBitmapBinary.charAt(10) == '1') { // Bit 11 - posEntryMode
+                    String posEntryMode = expected.substring(currentPos, currentPos + 2);
+                    String actualPosEntryMode = getJsonValue(actualJson, "transaction.additionalData.posEntryMode");
+                    if (!posEntryMode.equals(actualPosEntryMode)) {
+                        details.append("POS entry mode mismatch: expected ").append(posEntryMode)
+                              .append(", got ").append(actualPosEntryMode).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 2;
+                }
+
+                if (primaryBitmapBinary.charAt(14) == '1') { // Bit 15 - posTransactionStatus
+                    String posTransactionStatus = expected.substring(currentPos, currentPos + 1);
+                    String actualPosTransactionStatus = getJsonValue(actualJson, "transaction.additionalData.posTransactionStatus");
+                    if (!posTransactionStatus.equals(actualPosTransactionStatus)) {
+                        details.append("POS transaction status mismatch: expected ").append(posTransactionStatus)
+                              .append(", got ").append(actualPosTransactionStatus).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 1;
+                }
+
+                if (primaryBitmapBinary.charAt(25) == '1') { // Bit 26 - finalAuthIndicator
+                    String finalAuthIndicator = expected.substring(currentPos, currentPos + 1);
+                    String actualFinalAuthIndicator = getJsonValue(actualJson, "transaction.additionalData.finalAuthIndicator");
+                    if (!finalAuthIndicator.equals(actualFinalAuthIndicator)) {
+                        details.append("Final auth indicator mismatch: expected ").append(finalAuthIndicator)
+                              .append(", got ").append(actualFinalAuthIndicator).append("; ");
+                        allValid = false;
+                    }
+                    currentPos += 1;
+                }
+
+                // Check if secondary bitmap is present (bit 32)
+                if (primaryBitmapBinary.charAt(31) == '1') {
+                    String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
+                    String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+                    currentPos += 8;
+
+                    if (secondaryBitmapBinary.charAt(17) == '1') { // Bit 18 - linkedTransactionId
+                        String linkedTransactionId = expected.substring(currentPos, currentPos + 22);
+                        String actualLinkedTransactionId = getJsonValue(actualJson, "transaction.additionalData.linkedTransactionId");
+                        if (!linkedTransactionId.equals(actualLinkedTransactionId)) {
+                            details.append("Linked transaction ID mismatch: expected ").append(linkedTransactionId)
+                                  .append(", got ").append(actualLinkedTransactionId).append("; ");
+                            allValid = false;
+                        }
+                    }
+                }
+            }
+
+            if (allValid) {
+                result.addPassedField(de, expected, details.toString());
+            } else {
+                result.addFailedField(de, expected, details.toString());
+            }
+            return allValid;
+
+        } catch (Exception e) {
+            result.addFailedField(de, expected, "Failed to validate DE 111: " + e.getMessage());
             return false;
         }
     }
