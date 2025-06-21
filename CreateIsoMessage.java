@@ -936,6 +936,8 @@ public class CreateIsoMessage  {
                         return validateAdviceReversalCode(de, expected, actual, result, validation.get("rules"));
                     case "replacement_amounts":
                         return validateReplacementAmounts(de, expected, actual, result, validation.get("rules"));
+                    case "additional_data":
+                        return validateAdditionalData(de, expected, actual, result);
                     default:
                         System.out.println("Unknown validation type: " + validationType);
                 }
@@ -2893,7 +2895,7 @@ public class CreateIsoMessage  {
         }
     }
 
-    /**
+   /**
      * Validates DE 111 (Additional Data) based on format identifier MC or MD
      * @param de The data element number (111)
      * @param expected The expected DE 111 value
@@ -3094,7 +3096,7 @@ public class CreateIsoMessage  {
             return false;
         }
     }
-
+    
     /**
      * Exports validation results to a new sheet in the Excel workbook
      * @param workbook The Excel workbook to add the sheet to
