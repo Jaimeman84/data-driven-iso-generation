@@ -2047,17 +2047,122 @@
     "name": "Additional Data, Private Acquirer",
     "canonical": [
       "transaction.additionalData.formatIdentifier",
-      "transaction.additionalData.MCAssignedID",
+      "transaction.additionalData.mcAssignedId",
       "transaction.additionalData.isCnp",
-      "transaction.additionalData.address.zipCode"
+      "transaction.additionalData.address.zipCode",
+      "transaction.additionalData.operatingEnvironment",
+      "transaction.additionalData.posEntryMode",
+      "transaction.additionalData.posTransactionStatus",
+      "transaction.additionalData.finalAuthIndicator",
+      "transaction.additionalData.linkedTransactionId",
+      "transaction.additionalData.incrementalAuthIndicator"
     ],
     "format": "lllvar",
     "type": "alphanumeric",
     "length": null,
-    "notes": "Sent if available.",
+    "notes": "Contains format-specific (MC/MD) data elements with primary and secondary bitmaps determining field presence.",
     "max_length": 225,
-    "active": false,
-    "SampleData": "026ADPA1111111111111111MAX255"
+    "active": true,
+    "SampleData": {
+      "MC": "MC012FFFFEBFF551234567891234226001311234012333355513330123456705071204252741852963741852963741852963741122i225599101188101123412345678912FFFF0000123456789121234567891234561040221123221122213331234567891222aRyU-3Ti981f_6WvBaqM03",
+      "MD": "MD053DFE60041333555NXMS0010059001100004000dtsviQ6qT-mkEVM4r1YWvw"
+    },
+    "validation": {
+      "type": "additional_data",
+      "rules": {
+        "formatIdentifiers": {
+          "MC": {
+            "primaryBitmap": {
+              "position": "6-13",
+              "fields": {
+                "6": {
+                  "name": "zipCode",
+                  "length": 10,
+                  "path": "transaction.additionalData.address.zipCode"
+                },
+                "7": {
+                  "name": "isCnp",
+                  "length": 1,
+                  "path": "transaction.additionalData.isCnp"
+                },
+                "9": {
+                  "name": "mcAssignedId",
+                  "length": 6,
+                  "path": "transaction.additionalData.mcAssignedId"
+                },
+                "19": {
+                  "name": "incrementalAuthIndicator",
+                  "length": 1,
+                  "path": "transaction.additionalData.incrementalAuthIndicator"
+                },
+                "26": {
+                  "name": "finalAuthIndicator",
+                  "length": 1,
+                  "path": "transaction.additionalData.finalAuthIndicator"
+                }
+              }
+            },
+            "secondaryBitmap": {
+              "position": "32",
+              "fields": {
+                "16": {
+                  "name": "linkedTransactionId",
+                  "length": 22,
+                  "path": "transaction.additionalData.linkedTransactionId"
+                }
+              }
+            }
+          },
+          "MD": {
+            "primaryBitmap": {
+              "position": "6-13",
+              "fields": {
+                "1": {
+                  "name": "mcAssignedId",
+                  "length": 6,
+                  "path": "transaction.additionalData.mcAssignedId"
+                },
+                "5": {
+                  "name": "isCnp",
+                  "length": 1,
+                  "path": "transaction.additionalData.isCnp"
+                },
+                "6": {
+                  "name": "operatingEnvironment",
+                  "length": 1,
+                  "path": "transaction.additionalData.operatingEnvironment"
+                },
+                "11": {
+                  "name": "posEntryMode",
+                  "length": 2,
+                  "path": "transaction.additionalData.posEntryMode"
+                },
+                "15": {
+                  "name": "posTransactionStatus",
+                  "length": 1,
+                  "path": "transaction.additionalData.posTransactionStatus"
+                },
+                "26": {
+                  "name": "finalAuthIndicator",
+                  "length": 1,
+                  "path": "transaction.additionalData.finalAuthIndicator"
+                }
+              }
+            },
+            "secondaryBitmap": {
+              "position": "32",
+              "fields": {
+                "18": {
+                  "name": "linkedTransactionId",
+                  "length": 22,
+                  "path": "transaction.additionalData.linkedTransactionId"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "113": {
     "name": "Authorizing Agent Institution ID Code (ANSI-defined)",
