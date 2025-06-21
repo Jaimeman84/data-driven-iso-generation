@@ -2923,7 +2923,7 @@ public class CreateIsoMessage  {
      */
     private static boolean validateAdditionalData(String de, String expected, String actual, ValidationResult result) {
         try {
-            if (expected == null || expected.length() < 2) {
+            if (expected == null || expected.length() < 14) { // Must have at least format identifier, length, and bitmap
                 result.addFailedField(de, expected, "Invalid DE 111 length");
                 return false;
             }
@@ -2932,7 +2932,7 @@ public class CreateIsoMessage  {
             StringBuilder details = new StringBuilder();
             boolean allValid = true;
 
-            // Get format identifier (MC or MD)
+            // Get format identifier (MC or MD) - positions 1-2
             String formatIdentifier = expected.substring(0, 2);
             String actualFormatIdentifier = getJsonValue(actualJson, "transaction.additionalData.formatIdentifier");
             
@@ -2940,6 +2940,14 @@ public class CreateIsoMessage  {
                 result.addFailedField(de, expected, "Format identifier mismatch: expected " + formatIdentifier + ", got " + actualFormatIdentifier);
                 return false;
             }
+
+            // Skip length indicator (positions 3-5)
+            // Get primary bitmap (positions 6-13)
+            String primaryBitmapHex = expected.substring(5, 13);
+            String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
+            
+            // Current position starts after bitmap
+            int currentPos = 13;
 
             // Get validation rules for this format
             JsonNode config = fieldConfig.get(de);
@@ -2949,25 +2957,6 @@ public class CreateIsoMessage  {
                 result.addFailedField(de, expected, "No validation rules found for format " + formatIdentifier);
                 return false;
             }
-
-            // Get canonical paths for this format
-            JsonNode canonicalPaths = formatRules.path("canonicalPaths");
-            if (!canonicalPaths.isMissingNode() && canonicalPaths.isArray()) {
-                for (JsonNode pathNode : canonicalPaths) {
-                    String path = pathNode.asText();
-                    String actualValue = getJsonValue(actualJson, path);
-                    if (actualValue == null) {
-                        details.append("Missing value for path ").append(path).append("; ");
-                        allValid = false;
-                    }
-                }
-            }
-
-            // Process primary bitmap
-            int currentPos = 5; // Skip format identifier and length
-            String primaryBitmapHex = expected.substring(currentPos, currentPos + 8);
-            String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
-            currentPos += 8;
 
             JsonNode primaryFields = formatRules.path("primaryBitmap").path("fields");
             for (Iterator<Map.Entry<String, JsonNode>> it = primaryFields.fields(); it.hasNext();) {
