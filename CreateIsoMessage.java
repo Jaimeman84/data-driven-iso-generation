@@ -2905,187 +2905,107 @@ public class CreateIsoMessage  {
      */
     private static boolean validateAdditionalData(String de, String expected, String actual, ValidationResult result) {
         try {
+            if (expected == null || expected.length() < 2) {
+                result.addFailedField(de, expected, "Invalid DE 111 length");
+                return false;
+            }
+
             JsonNode actualJson = objectMapper.readTree(actual);
             StringBuilder details = new StringBuilder();
             boolean allValid = true;
 
-            // Extract format identifier (positions 1-2)
+            // Get format identifier (MC or MD)
             String formatIdentifier = expected.substring(0, 2);
             String actualFormatIdentifier = getJsonValue(actualJson, "transaction.additionalData.formatIdentifier");
+            
             if (!formatIdentifier.equals(actualFormatIdentifier)) {
-                details.append("Format identifier mismatch: expected ").append(formatIdentifier)
-                      .append(", got ").append(actualFormatIdentifier).append("; ");
-                allValid = false;
+                result.addFailedField(de, expected, "Format identifier mismatch: expected " + formatIdentifier + ", got " + actualFormatIdentifier);
+                return false;
             }
 
-            // Extract and convert primary bitmap (positions 6-13) to binary
-            String primaryBitmapHex = expected.substring(5, 13);
+            // Get validation rules for this format
+            JsonNode config = fieldConfig.get(de);
+            JsonNode formatRules = config.path("validation").path("rules").path("formatIdentifiers").path(formatIdentifier);
+            
+            if (formatRules.isMissingNode()) {
+                result.addFailedField(de, expected, "No validation rules found for format " + formatIdentifier);
+                return false;
+            }
+
+            // Get canonical paths for this format
+            JsonNode canonicalPaths = formatRules.path("canonicalPaths");
+            if (!canonicalPaths.isMissingNode() && canonicalPaths.isArray()) {
+                for (JsonNode pathNode : canonicalPaths) {
+                    String path = pathNode.asText();
+                    String actualValue = getJsonValue(actualJson, path);
+                    if (actualValue == null) {
+                        details.append("Missing value for path ").append(path).append("; ");
+                        allValid = false;
+                    }
+                }
+            }
+
+            // Process primary bitmap
+            int currentPos = 5; // Skip format identifier and length
+            String primaryBitmapHex = expected.substring(currentPos, currentPos + 8);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
+            currentPos += 8;
 
-            // Current position in the input string
-            int currentPos = 13;
-
-            if (formatIdentifier.equals("MC")) {
-                // Process MC format fields
-                if (primaryBitmapBinary.charAt(5) == '1') { // Bit 6 - zipCode
-                    String zipCode = expected.substring(currentPos, currentPos + 10);
-                    String actualZipCode = getJsonValue(actualJson, "transaction.additionalData.address.zipCode");
-                    if (!zipCode.equals(actualZipCode)) {
-                        details.append("Zip code mismatch: expected ").append(zipCode)
-                              .append(", got ").append(actualZipCode).append("; ");
+            JsonNode primaryFields = formatRules.path("primaryBitmap").path("fields");
+            for (Iterator<Map.Entry<String, JsonNode>> it = primaryFields.fields(); it.hasNext();) {
+                Map.Entry<String, JsonNode> field = it.next();
+                int bitPosition = Integer.parseInt(field.getKey());
+                
+                if (primaryBitmapBinary.charAt(bitPosition - 1) == '1') {
+                    JsonNode fieldConfig = field.getValue();
+                    String fieldName = fieldConfig.get("name").asText();
+                    int length = fieldConfig.get("length").asInt();
+                    String path = fieldConfig.get("path").asText();
+                    
+                    String expectedValue = expected.substring(currentPos, currentPos + length);
+                    String actualValue = getJsonValue(actualJson, path);
+                    
+                    if (!expectedValue.equals(actualValue)) {
+                        details.append(fieldName).append(" mismatch: expected ").append(expectedValue)
+                              .append(", got ").append(actualValue).append("; ");
                         allValid = false;
                     }
-                    currentPos += 10;
+                    currentPos += length;
                 }
+            }
 
-                if (primaryBitmapBinary.charAt(6) == '1') { // Bit 7 - isCnp
-                    String isCnp = expected.substring(currentPos, currentPos + 1);
-                    boolean actualIsCnp = actualJson.at("/transaction/additionalData/isCnp").asBoolean();
-                    if (("1".equals(isCnp) && !actualIsCnp) || ("0".equals(isCnp) && actualIsCnp)) {
-                        details.append("CNP indicator mismatch: expected ").append(isCnp)
-                              .append(", got ").append(actualIsCnp).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 1;
-                }
+            // Check for secondary bitmap
+            if (primaryBitmapBinary.charAt(31) == '1') {
+                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
+                String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+                currentPos += 8;
 
-                if (primaryBitmapBinary.charAt(8) == '1') { // Bit 9 - mcAssignedId
-                    String mcAssignedId = expected.substring(currentPos, currentPos + 6);
-                    String actualMcAssignedId = getJsonValue(actualJson, "transaction.additionalData.mcAssignedId");
-                    if (!mcAssignedId.equals(actualMcAssignedId)) {
-                        details.append("MC Assigned ID mismatch: expected ").append(mcAssignedId)
-                              .append(", got ").append(actualMcAssignedId).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 6;
-                }
-
-                if (primaryBitmapBinary.charAt(18) == '1') { // Bit 19 - incrementalAuthIndicator
-                    String incrementalAuthIndicator = expected.substring(currentPos, currentPos + 1);
-                    String actualIncrementalAuthIndicator = getJsonValue(actualJson, "transaction.additionalData.incrementalAuthIndicator");
-                    if (!actualIncrementalAuthIndicator.startsWith(incrementalAuthIndicator)) {
-                        details.append("Incremental auth indicator mismatch: expected ").append(incrementalAuthIndicator)
-                              .append(", got ").append(actualIncrementalAuthIndicator).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 1;
-                }
-
-                if (primaryBitmapBinary.charAt(25) == '1') { // Bit 26 - finalAuthIndicator
-                    String finalAuthIndicator = expected.substring(currentPos, currentPos + 1);
-                    String actualFinalAuthIndicator = getJsonValue(actualJson, "transaction.additionalData.finalAuthIndicator");
-                    if (!finalAuthIndicator.equals(actualFinalAuthIndicator)) {
-                        details.append("Final auth indicator mismatch: expected ").append(finalAuthIndicator)
-                              .append(", got ").append(actualFinalAuthIndicator).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 1;
-                }
-
-                // Check if secondary bitmap is present (bit 32)
-                if (primaryBitmapBinary.charAt(31) == '1') {
-                    String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
-                    String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                    currentPos += 8;
-
-                    if (secondaryBitmapBinary.charAt(15) == '1') { // Bit 16 - linkedTransactionId
-                        String linkedTransactionId = expected.substring(currentPos, currentPos + 22);
-                        String actualLinkedTransactionId = getJsonValue(actualJson, "transaction.additionalData.linkedTransactionId");
-                        if (!linkedTransactionId.equals(actualLinkedTransactionId)) {
-                            details.append("Linked transaction ID mismatch: expected ").append(linkedTransactionId)
-                                  .append(", got ").append(actualLinkedTransactionId).append("; ");
+                JsonNode secondaryFields = formatRules.path("secondaryBitmap").path("fields");
+                for (Iterator<Map.Entry<String, JsonNode>> it = secondaryFields.fields(); it.hasNext();) {
+                    Map.Entry<String, JsonNode> field = it.next();
+                    int bitPosition = Integer.parseInt(field.getKey());
+                    
+                    if (secondaryBitmapBinary.charAt(bitPosition - 1) == '1') {
+                        JsonNode fieldConfig = field.getValue();
+                        String fieldName = fieldConfig.get("name").asText();
+                        int length = fieldConfig.get("length").asInt();
+                        String path = fieldConfig.get("path").asText();
+                        
+                        String expectedValue = expected.substring(currentPos, currentPos + length);
+                        String actualValue = getJsonValue(actualJson, path);
+                        
+                        if (!expectedValue.equals(actualValue)) {
+                            details.append(fieldName).append(" mismatch: expected ").append(expectedValue)
+                                  .append(", got ").append(actualValue).append("; ");
                             allValid = false;
                         }
-                    }
-                }
-            } else if (formatIdentifier.equals("MD")) {
-                // Process MD format fields
-                if (primaryBitmapBinary.charAt(0) == '1') { // Bit 1 - mcAssignedId
-                    String mcAssignedId = expected.substring(currentPos, currentPos + 6);
-                    String actualMcAssignedId = getJsonValue(actualJson, "transaction.additionalData.mcAssignedId");
-                    if (!mcAssignedId.equals(actualMcAssignedId)) {
-                        details.append("MC Assigned ID mismatch: expected ").append(mcAssignedId)
-                              .append(", got ").append(actualMcAssignedId).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 6;
-                }
-
-                if (primaryBitmapBinary.charAt(4) == '1') { // Bit 5 - isCnp
-                    String isCnp = expected.substring(currentPos, currentPos + 1);
-                    boolean actualIsCnp = actualJson.at("/transaction/additionalData/isCnp").asBoolean();
-                    if (("1".equals(isCnp) && !actualIsCnp) || ("0".equals(isCnp) && actualIsCnp)) {
-                        details.append("CNP indicator mismatch: expected ").append(isCnp)
-                              .append(", got ").append(actualIsCnp).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 1;
-                }
-
-                if (primaryBitmapBinary.charAt(5) == '1') { // Bit 6 - operatingEnvironment
-                    String operatingEnvironment = expected.substring(currentPos, currentPos + 1);
-                    String actualOperatingEnvironment = getJsonValue(actualJson, "transaction.additionalData.operatingEnvironment");
-                    if (!operatingEnvironment.equals(actualOperatingEnvironment)) {
-                        details.append("Operating environment mismatch: expected ").append(operatingEnvironment)
-                              .append(", got ").append(actualOperatingEnvironment).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 1;
-                }
-
-                if (primaryBitmapBinary.charAt(10) == '1') { // Bit 11 - posEntryMode
-                    String posEntryMode = expected.substring(currentPos, currentPos + 2);
-                    String actualPosEntryMode = getJsonValue(actualJson, "transaction.additionalData.posEntryMode");
-                    if (!posEntryMode.equals(actualPosEntryMode)) {
-                        details.append("POS entry mode mismatch: expected ").append(posEntryMode)
-                              .append(", got ").append(actualPosEntryMode).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 2;
-                }
-
-                if (primaryBitmapBinary.charAt(14) == '1') { // Bit 15 - posTransactionStatus
-                    String posTransactionStatus = expected.substring(currentPos, currentPos + 1);
-                    String actualPosTransactionStatus = getJsonValue(actualJson, "transaction.additionalData.posTransactionStatus");
-                    if (!posTransactionStatus.equals(actualPosTransactionStatus)) {
-                        details.append("POS transaction status mismatch: expected ").append(posTransactionStatus)
-                              .append(", got ").append(actualPosTransactionStatus).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 1;
-                }
-
-                if (primaryBitmapBinary.charAt(25) == '1') { // Bit 26 - finalAuthIndicator
-                    String finalAuthIndicator = expected.substring(currentPos, currentPos + 1);
-                    String actualFinalAuthIndicator = getJsonValue(actualJson, "transaction.additionalData.finalAuthIndicator");
-                    if (!finalAuthIndicator.equals(actualFinalAuthIndicator)) {
-                        details.append("Final auth indicator mismatch: expected ").append(finalAuthIndicator)
-                              .append(", got ").append(actualFinalAuthIndicator).append("; ");
-                        allValid = false;
-                    }
-                    currentPos += 1;
-                }
-
-                // Check if secondary bitmap is present (bit 32)
-                if (primaryBitmapBinary.charAt(31) == '1') {
-                    String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
-                    String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                    currentPos += 8;
-
-                    if (secondaryBitmapBinary.charAt(17) == '1') { // Bit 18 - linkedTransactionId
-                        String linkedTransactionId = expected.substring(currentPos, currentPos + 22);
-                        String actualLinkedTransactionId = getJsonValue(actualJson, "transaction.additionalData.linkedTransactionId");
-                        if (!linkedTransactionId.equals(actualLinkedTransactionId)) {
-                            details.append("Linked transaction ID mismatch: expected ").append(linkedTransactionId)
-                                  .append(", got ").append(actualLinkedTransactionId).append("; ");
-                            allValid = false;
-                        }
+                        currentPos += length;
                     }
                 }
             }
 
             if (allValid) {
-                result.addPassedField(de, expected, details.toString());
+                result.addPassedField(de, expected, "All fields validated successfully for format " + formatIdentifier);
             } else {
                 result.addFailedField(de, expected, details.toString());
             }

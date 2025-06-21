@@ -2045,33 +2045,15 @@
   },
   "111": {
     "name": "Additional Data, Private Acquirer",
-    "canonical": {
-      "MC": [
-        "transaction.additionalData.formatIdentifier",
-        "transaction.additionalData.address.zipCode",
-        "transaction.additionalData.isCnp",
-        "transaction.additionalData.mcAssignedId",
-        "transaction.additionalData.incrementalAuthIndicator",
-        "transaction.additionalData.finalAuthIndicator",
-        "transaction.additionalData.linkedTransactionId"
-      ],
-      "MD": [
-        "transaction.additionalData.formatIdentifier",
-        "transaction.additionalData.mcAssignedId",
-        "transaction.additionalData.isCnp",
-        "transaction.additionalData.operatingEnvironment",
-        "transaction.additionalData.posEntryMode",
-        "transaction.additionalData.posTransactionStatus",
-        "transaction.additionalData.finalAuthIndicator",
-        "transaction.additionalData.linkedTransactionId"
-      ]
-    },
+    "canonical": [
+      "transaction.additionalData.formatIdentifier"
+    ],
     "format": "lllvar",
     "type": "alphanumeric",
     "length": null,
     "notes": "Contains format-specific (MC/MD) data elements with primary and secondary bitmaps determining field presence.",
     "max_length": 225,
-    "active": true,
+    "active": false,
     "SampleData": {
       "MC": "MC012FFFFEBFF551234567891234226001311234012333355513330123456705071204252741852963741852963741852963741122i225599101188101123412345678912FFFF0000123456789121234567891234561040221123221122213331234567891222aRyU-3Ti981f_6WvBaqM03",
       "MD": "MD053DFE60041333555NXMS0010059001100004000dtsviQ6qT-mkEVM4r1YWvw"
@@ -2081,6 +2063,15 @@
       "rules": {
         "formatIdentifiers": {
           "MC": {
+            "canonicalPaths": [
+              "transaction.additionalData.formatIdentifier",
+              "transaction.additionalData.address.zipCode",
+              "transaction.additionalData.isCnp",
+              "transaction.additionalData.mcAssignedId",
+              "transaction.additionalData.incrementalAuthIndicator",
+              "transaction.additionalData.finalAuthIndicator",
+              "transaction.additionalData.linkedTransactionId"
+            ],
             "primaryBitmap": {
               "position": "6-13",
               "fields": {
@@ -2123,6 +2114,16 @@
             }
           },
           "MD": {
+            "canonicalPaths": [
+              "transaction.additionalData.formatIdentifier",
+              "transaction.additionalData.mcAssignedId",
+              "transaction.additionalData.isCnp",
+              "transaction.additionalData.operatingEnvironment",
+              "transaction.additionalData.posEntryMode",
+              "transaction.additionalData.posTransactionStatus",
+              "transaction.additionalData.finalAuthIndicator",
+              "transaction.additionalData.linkedTransactionId"
+            ],
             "primaryBitmap": {
               "position": "6-13",
               "fields": {
