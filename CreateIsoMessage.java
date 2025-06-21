@@ -763,6 +763,24 @@ public class CreateIsoMessage  {
                 JsonNode config = fieldConfig.get(de);
                 ((ObjectNode) config).put("canonical", objectMapper.valueToTree(canonicalPaths));
             }
+            
+            // Special handling for DE 111 (Additional Data)
+            if (de.equals("111")) {
+                String formatIdentifier = expectedValue.substring(0, 2);
+                List<String> canonicalPaths = getCanonicalPaths(de);
+                JsonNode config = fieldConfig.get(de);
+                JsonNode formatRules = config.path("validation").path("rules").path("formatIdentifiers").path(formatIdentifier);
+                
+                if (!formatRules.isMissingNode() && formatRules.has("paths")) {
+                    // Keep only the paths defined for this format
+                    List<String> formatPaths = new ArrayList<>();
+                    formatRules.get("paths").forEach(node -> formatPaths.add(node.asText()));
+                    canonicalPaths.removeIf(path -> !formatPaths.contains(path));
+                    
+                    // Update the config with filtered paths
+                    ((ObjectNode) config).put("canonical", objectMapper.valueToTree(canonicalPaths));
+                }
+            }
 
             List<String> canonicalPaths = getCanonicalPaths(de);
             if (!canonicalPaths.isEmpty()) {

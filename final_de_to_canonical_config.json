@@ -2046,7 +2046,16 @@
   "111": {
     "name": "Additional Data, Private Acquirer",
     "canonical": [
-      "transaction.additionalData.formatIdentifier"
+      "transaction.additionalData.formatIdentifier",
+      "transaction.additionalData.address.zipCode",
+      "transaction.additionalData.isCnp",
+      "transaction.additionalData.mcAssignedId",
+      "transaction.additionalData.incrementalAuthIndicator",
+      "transaction.additionalData.finalAuthIndicator",
+      "transaction.additionalData.linkedTransactionId",
+      "transaction.additionalData.operatingEnvironment",
+      "transaction.additionalData.posEntryMode",
+      "transaction.additionalData.posTransactionStatus"
     ],
     "format": "lllvar",
     "type": "alphanumeric",
@@ -2063,7 +2072,7 @@
       "rules": {
         "formatIdentifiers": {
           "MC": {
-            "canonicalPaths": [
+            "paths": [
               "transaction.additionalData.formatIdentifier",
               "transaction.additionalData.address.zipCode",
               "transaction.additionalData.isCnp",
@@ -2114,7 +2123,7 @@
             }
           },
           "MD": {
-            "canonicalPaths": [
+            "paths": [
               "transaction.additionalData.formatIdentifier",
               "transaction.additionalData.mcAssignedId",
               "transaction.additionalData.isCnp",
