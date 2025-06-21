@@ -2045,18 +2045,27 @@
   },
   "111": {
     "name": "Additional Data, Private Acquirer",
-    "canonical": [
-      "transaction.additionalData.formatIdentifier",
-      "transaction.additionalData.mcAssignedId",
-      "transaction.additionalData.isCnp",
-      "transaction.additionalData.address.zipCode",
-      "transaction.additionalData.operatingEnvironment",
-      "transaction.additionalData.posEntryMode",
-      "transaction.additionalData.posTransactionStatus",
-      "transaction.additionalData.finalAuthIndicator",
-      "transaction.additionalData.linkedTransactionId",
-      "transaction.additionalData.incrementalAuthIndicator"
-    ],
+    "canonical": {
+      "MC": [
+        "transaction.additionalData.formatIdentifier",
+        "transaction.additionalData.address.zipCode",
+        "transaction.additionalData.isCnp",
+        "transaction.additionalData.mcAssignedId",
+        "transaction.additionalData.incrementalAuthIndicator",
+        "transaction.additionalData.finalAuthIndicator",
+        "transaction.additionalData.linkedTransactionId"
+      ],
+      "MD": [
+        "transaction.additionalData.formatIdentifier",
+        "transaction.additionalData.mcAssignedId",
+        "transaction.additionalData.isCnp",
+        "transaction.additionalData.operatingEnvironment",
+        "transaction.additionalData.posEntryMode",
+        "transaction.additionalData.posTransactionStatus",
+        "transaction.additionalData.finalAuthIndicator",
+        "transaction.additionalData.linkedTransactionId"
+      ]
+    },
     "format": "lllvar",
     "type": "alphanumeric",
     "length": null,
