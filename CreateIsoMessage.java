@@ -2958,13 +2958,20 @@ public class CreateIsoMessage  {
                 return false;
             }
 
+            // Create a map of field names to their canonical paths
+            Map<String, String> fieldPaths = new HashMap<>();
+            validPaths.forEach(pathNode -> {
+                String path = pathNode.asText();
+                String fieldName = path.substring(path.lastIndexOf(".") + 1);
+                fieldPaths.put(fieldName, path);
+            });
+
             // Get primary bitmap (positions 6-13)
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
             
             System.out.println("DE 111 - Primary Bitmap Hex: " + primaryBitmapHex);
             System.out.println("DE 111 - Primary Bitmap Binary: " + primaryBitmapBinary);
-            System.out.println("DE 111 - Current Position before processing: " + currentPos);
             
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
@@ -2974,14 +2981,15 @@ public class CreateIsoMessage  {
                 JsonNode bitConfig = formatConfig.get("primaryBitmap").get("fields").get(String.valueOf(bit));
                 if (bitConfig != null) {
                     int fieldLength = bitConfig.get("length").asInt();
+                    String fieldName = bitConfig.get("name").asText();
                     
                     // If bit is set (1), validate the field
                     if (primaryBitmapBinary.charAt(bit - 1) == '1') {
                         String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                         
-                        // Only validate if this field has a canonical path
-                        if (bitConfig.has("path")) {
-                            String canonicalPath = "transaction.additionalData." + formatIdentifier + "." + bitConfig.get("path").asText();
+                        // Only validate if this field has a path in the paths array
+                        if (fieldPaths.containsKey(fieldName)) {
+                            String canonicalPath = fieldPaths.get(fieldName);
                             
                             // Special handling for isCnp
                             if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
@@ -3010,7 +3018,7 @@ public class CreateIsoMessage  {
                                 String actualValue = getJsonValue(actualJson, canonicalPath);
                                 if (!fieldValue.equals(actualValue)) {
                                     details.append(String.format("Field %d (%s) mismatch: expected=%s, actual=%s; ", 
-                                        bit, bitConfig.get("name").asText(), fieldValue, actualValue));
+                                        bit, fieldName, fieldValue, actualValue));
                                     allValid = false;
                                 }
                             }
@@ -3035,19 +3043,20 @@ public class CreateIsoMessage  {
                     JsonNode bitConfig = formatConfig.get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
                     if (bitConfig != null) {
                         int fieldLength = bitConfig.get("length").asInt();
+                        String fieldName = bitConfig.get("name").asText();
                         
                         // If bit is set (1), process the field
                         if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
                             String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                             
-                            // Validate if this field has a canonical path
-                            if (bitConfig.has("path")) {
-                                String canonicalPath = "transaction.additionalData." + formatIdentifier + "." + bitConfig.get("path").asText();
+                            // Validate if this field has a path in the paths array
+                            if (fieldPaths.containsKey(fieldName)) {
+                                String canonicalPath = fieldPaths.get(fieldName);
                                 String actualValue = getJsonValue(actualJson, canonicalPath);
                                 
                                 if (!fieldValue.equals(actualValue)) {
                                     details.append(String.format("Field %d (%s) mismatch: expected=%s, actual=%s; ", 
-                                        actualBit, bitConfig.get("name").asText(), fieldValue, actualValue));
+                                        actualBit, fieldName, fieldValue, actualValue));
                                     allValid = false;
                                 }
                             }
