@@ -2962,8 +2962,8 @@ public class CreateIsoMessage  {
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
             
-            // Process primary bitmap bits
-            for (int bit = 1; bit <= 64; bit++) {
+            // Process primary bitmap bits (32 bits)
+            for (int bit = 1; bit <= 32; bit++) {
                 JsonNode bitConfig = formatConfig.get("primaryBitmap").get("fields").get(String.valueOf(bit));
                 if (bitConfig != null) {
                     int fieldLength = bitConfig.get("length").asInt();
@@ -3008,31 +3008,25 @@ public class CreateIsoMessage  {
                                 }
                             }
                         }
-                        // Move position increment inside bit check
                         currentPos += fieldLength;
                     }
-                    // Remove the position increment from here
                 }
             }
             
-            // Before secondary bitmap check
-            System.out.println("DE 111 - Position before secondary bitmap check: " + currentPos);
-            
             // Check if secondary bitmap is present (bit 32 of primary bitmap)
             if (primaryBitmapBinary.charAt(31) == '1') {
-                System.out.println("DE 111 - Secondary bitmap detected, attempting to read positions " + currentPos + " to " + (currentPos + 8));
-                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
+                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 4);  // Changed from 8 to 4 bytes
                 String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                currentPos += 8;
+                currentPos += 4;  // Changed from 8 to 4
                 
-                // Process secondary bitmap bits
-                for (int bit = 1; bit <= 64; bit++) {
-                    int actualBit = bit + 64;  // Adjust bit number for secondary bitmap
+                // Process secondary bitmap bits (32 bits)
+                for (int bit = 1; bit <= 32; bit++) {
+                    int actualBit = bit + 32;  // Changed from 64 to 32 for correct field numbering
                     JsonNode bitConfig = formatConfig.get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
                     if (bitConfig != null) {
                         int fieldLength = bitConfig.get("length").asInt();
                         
-                        // If bit is set (1), process the field and advance position
+                        // If bit is set (1), process the field
                         if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
                             String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                             
@@ -3047,10 +3041,8 @@ public class CreateIsoMessage  {
                                     allValid = false;
                                 }
                             }
-                            // Advance position only for set bits
                             currentPos += fieldLength;
                         }
-                        // No else needed - we don't advance position for unset bits
                     }
                 }
             }
