@@ -2955,19 +2955,28 @@ public class CreateIsoMessage  {
                 return false;
             }
 
+            // Start position after format identifier (2) + length (3) + primary bitmap (8) = 13
+            int currentPos = 13;
+
+            // First, create a sorted map of bit positions to field configs
+            Map<Integer, JsonNode> sortedFields = new TreeMap<>();
             JsonNode primaryFields = formatRules.path("primaryBitmap").path("fields");
-            for (Iterator<Map.Entry<String, JsonNode>> it = primaryFields.fields(); it.hasNext();) {
-                Map.Entry<String, JsonNode> field = it.next();
-                int bitPosition = Integer.parseInt(field.getKey());
+            primaryFields.fields().forEachRemaining(field -> 
+                sortedFields.put(Integer.parseInt(field.getKey()), field.getValue()));
+
+            // Process fields in order of bit position
+            for (Map.Entry<Integer, JsonNode> entry : sortedFields.entrySet()) {
+                int bitPosition = entry.getKey();
+                JsonNode fieldConfig = entry.getValue();
                 
+                // Check if this field is present in the bitmap
                 if (primaryBitmapBinary.charAt(bitPosition - 1) == '1') {
-                    JsonNode fieldConfig = field.getValue();
                     String fieldName = fieldConfig.get("name").asText();
-                    int startPos = fieldConfig.get("startPos").asInt();
-                    int endPos = fieldConfig.get("endPos").asInt();
+                    int length = fieldConfig.get("length").asInt();
                     String path = fieldConfig.get("path").asText();
                     
-                    String expectedValue = expected.substring(startPos - 1, endPos);
+                    // Read the field value at the current position
+                    String expectedValue = expected.substring(currentPos, currentPos + length);
                     String actualValue = getJsonValue(actualJson, path);
                     
                     if (!expectedValue.equals(actualValue)) {
@@ -2975,33 +2984,38 @@ public class CreateIsoMessage  {
                               .append(", got ").append(actualValue).append("; ");
                         allValid = false;
                     }
+                    
+                    // Move position by the length of this field
+                    currentPos += length;
                 }
             }
 
             // Check for secondary bitmap
             if (primaryBitmapBinary.charAt(31) == '1') {
-                // Get secondary bitmap position from config
-                JsonNode secondaryBitmapConfig = formatRules.path("secondaryBitmap");
-                String[] positions = secondaryBitmapConfig.get("position").asText().split("-");
-                int bitmapStart = Integer.parseInt(positions[0]);
-                int bitmapEnd = Integer.parseInt(positions[1]);
-                
-                String secondaryBitmapHex = expected.substring(bitmapStart - 1, bitmapEnd);
+                // Read secondary bitmap
+                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
                 String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+                currentPos += 8;
 
-                JsonNode secondaryFields = secondaryBitmapConfig.path("fields");
-                for (Iterator<Map.Entry<String, JsonNode>> it = secondaryFields.fields(); it.hasNext();) {
-                    Map.Entry<String, JsonNode> field = it.next();
-                    int bitPosition = Integer.parseInt(field.getKey());
+                // Create sorted map for secondary fields
+                Map<Integer, JsonNode> sortedSecondaryFields = new TreeMap<>();
+                JsonNode secondaryFields = formatRules.path("secondaryBitmap").path("fields");
+                secondaryFields.fields().forEachRemaining(field -> 
+                    sortedSecondaryFields.put(Integer.parseInt(field.getKey()), field.getValue()));
+
+                // Process secondary fields in order
+                for (Map.Entry<Integer, JsonNode> entry : sortedSecondaryFields.entrySet()) {
+                    int bitPosition = entry.getKey();
+                    JsonNode fieldConfig = entry.getValue();
                     
+                    // Check if this field is present in the bitmap
                     if (secondaryBitmapBinary.charAt(bitPosition - 1) == '1') {
-                        JsonNode fieldConfig = field.getValue();
                         String fieldName = fieldConfig.get("name").asText();
-                        int startPos = fieldConfig.get("startPos").asInt();
-                        int endPos = fieldConfig.get("endPos").asInt();
+                        int length = fieldConfig.get("length").asInt();
                         String path = fieldConfig.get("path").asText();
                         
-                        String expectedValue = expected.substring(startPos - 1, endPos);
+                        // Read the field value at the current position
+                        String expectedValue = expected.substring(currentPos, currentPos + length);
                         String actualValue = getJsonValue(actualJson, path);
                         
                         if (!expectedValue.equals(actualValue)) {
@@ -3009,6 +3023,9 @@ public class CreateIsoMessage  {
                                   .append(", got ").append(actualValue).append("; ");
                             allValid = false;
                         }
+                        
+                        // Move position by the length of this field
+                        currentPos += length;
                     }
                 }
             }
