@@ -2970,12 +2970,37 @@ public class CreateIsoMessage  {
                         // Only validate if this field has a canonical path
                         if (fieldConfig.has("path")) {
                             String canonicalPath = fieldConfig.get("path").asText();
-                            String actualValue = getJsonValue(actualJson, canonicalPath);
                             
-                            if (!fieldValue.equals(actualValue)) {
-                                details.append(String.format("Field %d (%s) mismatch: expected=%s, actual=%s; ", 
-                                    bit, fieldConfig.get("name").asText(), fieldValue, actualValue));
-                                allValid = false;
+                            // Special handling for isCnp
+                            if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
+                                // For isCnp: 0 = true, 1 = not present
+                                if (fieldValue.equals("0")) {
+                                    String actualValue = getJsonValue(actualJson, canonicalPath);
+                                    if (!"true".equals(actualValue)) {
+                                        details.append(String.format("Field %d (isCnp) mismatch: expected=true, actual=%s; ", 
+                                            bit, actualValue));
+                                        allValid = false;
+                                    }
+                                } else if (fieldValue.equals("1")) {
+                                    // isCnp should not be present in the object
+                                    if (actualJson.at(canonicalPath).isNull() || actualJson.at(canonicalPath).isMissingNode()) {
+                                        // This is correct - field should not be present
+                                    } else {
+                                        details.append(String.format("Field %d (isCnp) error: should not be present when value is 1; ", bit));
+                                        allValid = false;
+                                    }
+                                } else {
+                                    details.append(String.format("Field %d (isCnp) invalid value: %s; ", bit, fieldValue));
+                                    allValid = false;
+                                }
+                            } else {
+                                // Normal validation for other fields
+                                String actualValue = getJsonValue(actualJson, canonicalPath);
+                                if (!fieldValue.equals(actualValue)) {
+                                    details.append(String.format("Field %d (%s) mismatch: expected=%s, actual=%s; ", 
+                                        bit, fieldConfig.get("name").asText(), fieldValue, actualValue));
+                                    allValid = false;
+                                }
                             }
                         }
                     }
