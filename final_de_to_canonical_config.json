@@ -2139,41 +2139,55 @@
                 "1": {
                   "name": "mcAssignedId",
                   "length": 6,
+                  "startPos": 14,
+                  "endPos": 19,
                   "path": "transaction.additionalData.mcAssignedId"
                 },
                 "5": {
                   "name": "isCnp",
                   "length": 1,
+                  "startPos": 25,
+                  "endPos": 25,
                   "path": "transaction.additionalData.isCnp"
                 },
                 "6": {
                   "name": "operatingEnvironment",
                   "length": 1,
+                  "startPos": 26,
+                  "endPos": 26,
                   "path": "transaction.additionalData.operatingEnvironment"
                 },
                 "11": {
                   "name": "posEntryMode",
                   "length": 2,
+                  "startPos": 31,
+                  "endPos": 32,
                   "path": "transaction.additionalData.posEntryMode"
                 },
                 "15": {
                   "name": "posTransactionStatus",
                   "length": 1,
+                  "startPos": 43,
+                  "endPos": 43,
                   "path": "transaction.additionalData.posTransactionStatus"
                 },
                 "26": {
                   "name": "finalAuthIndicator",
                   "length": 1,
+                  "startPos": 84,
+                  "endPos": 84,
                   "path": "transaction.additionalData.finalAuthIndicator"
                 }
               }
             },
             "secondaryBitmap": {
-              "position": "32",
+              "position": "127-134",
               "fields": {
-                "18": {
+                "50": {
                   "name": "linkedTransactionId",
                   "length": 22,
+                  "startPos": 206,
+                  "endPos": 227,
                   "path": "transaction.additionalData.linkedTransactionId"
                 }
               }
