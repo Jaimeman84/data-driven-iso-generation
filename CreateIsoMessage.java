@@ -2951,6 +2951,13 @@ public class CreateIsoMessage  {
                 return false;
             }
 
+            // Get the list of valid paths for this format
+            JsonNode validPaths = formatConfig.get("paths");
+            if (validPaths == null || !validPaths.isArray()) {
+                result.addFailedField(de, expected, "Invalid format configuration - missing paths array");
+                return false;
+            }
+
             // Get primary bitmap (positions 6-13)
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
@@ -2977,7 +2984,7 @@ public class CreateIsoMessage  {
                             String canonicalPath = "transaction.additionalData." + formatIdentifier + "." + bitConfig.get("path").asText();
                             
                             // Special handling for isCnp
-                            if (bit == 5 && canonicalPath.endsWith("isCnp")) {
+                            if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
                                 // For isCnp: 0 = true, 1 = not present
                                 if (fieldValue.equals("0")) {
                                     String actualValue = getJsonValue(actualJson, canonicalPath);
