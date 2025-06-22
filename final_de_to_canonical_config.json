@@ -2139,43 +2139,111 @@
                 "1": {
                   "name": "mcAssignedId",
                   "length": 6,
-                  "startPos": 14,
-                  "endPos": 19,
                   "path": "transaction.additionalData.mcAssignedId"
+                },
+                "2": {
+                  "name": "crossBorderIndicator",
+                  "length": 2
+                },
+                "3": {
+                  "name": "reserved1",
+                  "length": 1
+                },
+                "4": {
+                  "name": "financialNetworkCode",
+                  "length": 2
                 },
                 "5": {
                   "name": "isCnp",
                   "length": 1,
-                  "startPos": 25,
-                  "endPos": 25,
                   "path": "transaction.additionalData.isCnp"
                 },
                 "6": {
                   "name": "operatingEnvironment",
                   "length": 1,
-                  "startPos": 26,
-                  "endPos": 26,
                   "path": "transaction.additionalData.operatingEnvironment"
+                },
+                "7": {
+                  "name": "terminalAttendance",
+                  "length": 1
+                },
+                "8": {
+                  "name": "cardholderPresence",
+                  "length": 1
+                },
+                "9": {
+                  "name": "cardholderActivatedTerminal",
+                  "length": 1
+                },
+                "10": {
+                  "name": "cardDataInput",
+                  "length": 1
                 },
                 "11": {
                   "name": "posEntryMode",
                   "length": 2,
-                  "startPos": 31,
-                  "endPos": 32,
                   "path": "transaction.additionalData.posEntryMode"
+                },
+                "12": {
+                  "name": "transactionType",
+                  "length": 3
+                },
+                "13": {
+                  "name": "mcAssignedId2",
+                  "length": 6
+                },
+                "14": {
+                  "name": "healthcareIIAS",
+                  "length": 1
                 },
                 "15": {
                   "name": "posTransactionStatus",
                   "length": 1,
-                  "startPos": 43,
-                  "endPos": 43,
                   "path": "transaction.additionalData.posTransactionStatus"
+                },
+                "16": {
+                  "name": "reserved2",
+                  "length": 0
+                },
+                "17": {
+                  "name": "paymentInitiationChannel",
+                  "length": 2
+                },
+                "18": {
+                  "name": "transitTransactionType",
+                  "length": 2
+                },
+                "19": {
+                  "name": "transportationMode",
+                  "length": 2
+                },
+                "20": {
+                  "name": "maestroPinless",
+                  "length": 1
+                },
+                "21": {
+                  "name": "acquiringInstitutionId",
+                  "length": 11
+                },
+                "22": {
+                  "name": "cardAcceptorId",
+                  "length": 15
+                },
+                "23": {
+                  "name": "walletData",
+                  "length": 3
+                },
+                "24": {
+                  "name": "terminalCompliant",
+                  "length": 2
+                },
+                "25": {
+                  "name": "mcOnBehalfService",
+                  "length": 2
                 },
                 "26": {
                   "name": "finalAuthIndicator",
                   "length": 1,
-                  "startPos": 84,
-                  "endPos": 84,
                   "path": "transaction.additionalData.finalAuthIndicator"
                 }
               }
@@ -2183,11 +2251,77 @@
             "secondaryBitmap": {
               "position": "127-134",
               "fields": {
+                "33": {
+                  "name": "authenticationIndicator",
+                  "length": 1
+                },
+                "34": {
+                  "name": "adviceReasonCode",
+                  "length": 3
+                },
+                "35": {
+                  "name": "adviceDetailCode",
+                  "length": 4
+                },
+                "36": {
+                  "name": "assessmentScore",
+                  "length": 3
+                },
+                "37": {
+                  "name": "scoreReasonCode",
+                  "length": 2
+                },
+                "38": {
+                  "name": "rulesScore",
+                  "length": 3
+                },
+                "39": {
+                  "name": "rulesReasonCode1",
+                  "length": 2
+                },
+                "40": {
+                  "name": "rulesReasonCode2",
+                  "length": 2
+                },
+                "41": {
+                  "name": "airlineTicketNumber",
+                  "length": 15
+                },
+                "42": {
+                  "name": "cvc2ValidationIndicator",
+                  "length": 1
+                },
+                "43": {
+                  "name": "qpsContactlessIndicator",
+                  "length": 1
+                },
+                "44": {
+                  "name": "mposAcceptanceDevice",
+                  "length": 1
+                },
+                "45": {
+                  "name": "terminalCapability",
+                  "length": 2
+                },
+                "46": {
+                  "name": "traceId",
+                  "length": 15
+                },
+                "47": {
+                  "name": "merchantCountryOrigin",
+                  "length": 3
+                },
+                "48": {
+                  "name": "merchantPaymentGatewayId",
+                  "length": 11
+                },
+                "49": {
+                  "name": "dataVerificationType",
+                  "length": 2
+                },
                 "50": {
                   "name": "linkedTransactionId",
                   "length": 22,
-                  "startPos": 206,
-                  "endPos": 227,
                   "path": "transaction.additionalData.linkedTransactionId"
                 }
               }

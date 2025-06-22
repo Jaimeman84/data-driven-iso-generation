@@ -2937,108 +2937,100 @@ public class CreateIsoMessage  {
             String actualFormatIdentifier = getJsonValue(actualJson, "transaction.additionalData.formatIdentifier");
             
             if (!formatIdentifier.equals(actualFormatIdentifier)) {
-                result.addFailedField(de, expected, "Format identifier mismatch: expected " + formatIdentifier + ", got " + actualFormatIdentifier);
+                result.addFailedField(de, formatIdentifier, actualFormatIdentifier);
                 return false;
             }
 
-            // Skip length indicator (positions 3-5)
+            // Skip length (positions 3-5)
+            
             // Get primary bitmap (positions 6-13)
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
-
-            // Get validation rules for this format
-            JsonNode config = fieldConfig.get(de);
-            JsonNode formatRules = config.path("validation").path("rules").path("formatIdentifiers").path(formatIdentifier);
             
-            if (formatRules.isMissingNode()) {
-                result.addFailedField(de, expected, "No validation rules found for format " + formatIdentifier);
+            // Get config for format
+            JsonNode formatConfig = fieldConfig.get("111").get("validation").get("rules").get("formatIdentifiers").get(formatIdentifier);
+            if (formatConfig == null) {
+                result.addFailedField(de, expected, "Unsupported format identifier: " + formatIdentifier);
                 return false;
             }
 
-            // Start position after format identifier (2) + length (3) + primary bitmap (8) = 13
-            int currentPos = 13;
-
-            // First, create a sorted map of bit positions to field configs
-            Map<Integer, JsonNode> sortedFields = new TreeMap<>();
-            JsonNode primaryFields = formatRules.path("primaryBitmap").path("fields");
-            primaryFields.fields().forEachRemaining(field -> 
-                sortedFields.put(Integer.parseInt(field.getKey()), field.getValue()));
-
-            // Process fields in order of bit position
-            for (Map.Entry<Integer, JsonNode> entry : sortedFields.entrySet()) {
-                int bitPosition = entry.getKey();
-                JsonNode fieldConfig = entry.getValue();
-                
-                // Check if this field is present in the bitmap
-                if (primaryBitmapBinary.charAt(bitPosition - 1) == '1') {
-                    String fieldName = fieldConfig.get("name").asText();
-                    int length = fieldConfig.get("length").asInt();
-                    String path = fieldConfig.get("path").asText();
+            // Start processing from position 14 (after format identifier, length, and primary bitmap)
+            int currentPos = 14;
+            
+            // Process primary bitmap bits
+            for (int bit = 1; bit <= 64; bit++) {
+                JsonNode fieldConfig = formatConfig.get("primaryBitmap").get("fields").get(String.valueOf(bit));
+                if (fieldConfig != null) {
+                    int fieldLength = fieldConfig.get("length").asInt();
                     
-                    // Read the field value at the current position
-                    String expectedValue = expected.substring(currentPos, currentPos + length);
-                    String actualValue = getJsonValue(actualJson, path);
-                    
-                    if (!expectedValue.equals(actualValue)) {
-                        details.append(fieldName).append(" mismatch: expected ").append(expectedValue)
-                              .append(", got ").append(actualValue).append("; ");
-                        allValid = false;
+                    // If bit is set (1), validate the field
+                    if (primaryBitmapBinary.charAt(bit - 1) == '1') {
+                        String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
+                        
+                        // Only validate if this field has a canonical path
+                        if (fieldConfig.has("path")) {
+                            String canonicalPath = fieldConfig.get("path").asText();
+                            String actualValue = getJsonValue(actualJson, canonicalPath);
+                            
+                            if (!fieldValue.equals(actualValue)) {
+                                details.append(String.format("Field %d (%s) mismatch: expected=%s, actual=%s; ", 
+                                    bit, fieldConfig.get("name").asText(), fieldValue, actualValue));
+                                allValid = false;
+                            }
+                        }
                     }
                     
-                    // Move position by the length of this field
-                    currentPos += length;
+                    // Always advance position by field length, whether bit is set or not
+                    currentPos += fieldLength;
                 }
             }
-
-            // Check for secondary bitmap
-            if (primaryBitmapBinary.charAt(31) == '1') {
-                // Read secondary bitmap
+            
+            // Check if secondary bitmap is present (bit 1 of primary bitmap)
+            if (primaryBitmapBinary.charAt(0) == '1') {
                 String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
                 String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
                 currentPos += 8;
-
-                // Create sorted map for secondary fields
-                Map<Integer, JsonNode> sortedSecondaryFields = new TreeMap<>();
-                JsonNode secondaryFields = formatRules.path("secondaryBitmap").path("fields");
-                secondaryFields.fields().forEachRemaining(field -> 
-                    sortedSecondaryFields.put(Integer.parseInt(field.getKey()), field.getValue()));
-
-                // Process secondary fields in order
-                for (Map.Entry<Integer, JsonNode> entry : sortedSecondaryFields.entrySet()) {
-                    int bitPosition = entry.getKey();
-                    JsonNode fieldConfig = entry.getValue();
-                    
-                    // Check if this field is present in the bitmap
-                    if (secondaryBitmapBinary.charAt(bitPosition - 1) == '1') {
-                        String fieldName = fieldConfig.get("name").asText();
-                        int length = fieldConfig.get("length").asInt();
-                        String path = fieldConfig.get("path").asText();
+                
+                // Process secondary bitmap bits
+                for (int bit = 1; bit <= 64; bit++) {
+                    int actualBit = bit + 64;  // Adjust bit number for secondary bitmap
+                    JsonNode fieldConfig = formatConfig.get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
+                    if (fieldConfig != null) {
+                        int fieldLength = fieldConfig.get("length").asInt();
                         
-                        // Read the field value at the current position
-                        String expectedValue = expected.substring(currentPos, currentPos + length);
-                        String actualValue = getJsonValue(actualJson, path);
-                        
-                        if (!expectedValue.equals(actualValue)) {
-                            details.append(fieldName).append(" mismatch: expected ").append(expectedValue)
-                                  .append(", got ").append(actualValue).append("; ");
-                            allValid = false;
+                        // If bit is set (1), validate the field
+                        if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
+                            String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
+                            
+                            // Only validate if this field has a canonical path
+                            if (fieldConfig.has("path")) {
+                                String canonicalPath = fieldConfig.get("path").asText();
+                                String actualValue = getJsonValue(actualJson, canonicalPath);
+                                
+                                if (!fieldValue.equals(actualValue)) {
+                                    details.append(String.format("Field %d (%s) mismatch: expected=%s, actual=%s; ", 
+                                        actualBit, fieldConfig.get("name").asText(), fieldValue, actualValue));
+                                    allValid = false;
+                                }
+                            }
                         }
                         
-                        // Move position by the length of this field
-                        currentPos += length;
+                        // Always advance position by field length, whether bit is set or not
+                        currentPos += fieldLength;
                     }
                 }
             }
 
-            if (allValid) {
-                result.addPassedField(de, expected, "All fields validated successfully for format " + formatIdentifier);
-            } else {
+            if (!allValid) {
                 result.addFailedField(de, expected, details.toString());
+            } else {
+                result.addPassedField(de, expected, actual);
             }
+            
             return allValid;
 
         } catch (Exception e) {
-            result.addFailedField(de, expected, "Failed to validate DE 111: " + e.getMessage());
+            result.addFailedField(de, expected, "Error validating DE 111: " + e.getMessage());
             return false;
         }
     }

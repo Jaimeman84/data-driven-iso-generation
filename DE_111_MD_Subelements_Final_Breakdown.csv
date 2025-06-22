@@ -1,0 +1,54 @@
+Subelement Name,Data Length,Bit No,Start Position,End Position
+Format Identifier,2,,1,2
+Data Length,3,,3,5
+Data Byte Map,8,,6,13
+MC Assigned ID,6,1,14,19
+Cross Border Transaction Indicator / Cross Border Currency Indicator,2,2,20,21
+Reserved,1,3,22,22
+Financial Network Code,2,4,23,24
+Card Present,1,5,25,25
+Operating Environment,1,6,26,26
+POS Terminal Attendance Indicator,1,7,27,27
+POS Cardholder Presence Indicator,1,8,28,28
+Cardholder-Activated Terminal Level Indicator,1,9,29,29
+POS Card Data Terminal Input Capability Indicator,1,10,30,30
+POS Entry Mode,2,11, 532
+Transaction Type Identifier,3,12,33,35
+MC Assigned ID,6,13,36,41
+MC Healthcare IIAS Exemption,1,14,42,42
+POS Transaction Status,1,15,43,43
+Reserved,0,16,44,43
+Payment Initiation Channel Device Type,2,17,44,45
+Transit Transaction Type Indicator,2,18,46,47
+Transportation Mode Indicator,2,19,48,49
+Maestro Pin-less Program Indicator,1,20,50,50
+Acquiring Institution ID,11,21,51,61
+Card Acceptor ID,15,22,62,76
+Wallet Data,3,23,77,79
+Terminal Compliant Indicator,2,24,80,81
+MC On-behalf Service,2,25,82,83
+MC On-behalf Result 1,1,26,84,84
+AllPoint Surcharge-Free Alliance Indicator,1,27,85,85
+Merchant Fraud Score,4,28,86,89
+Payment Facilitator ID,11,29,90,100
+Sales Organization ID,11,30,101,111
+Sub Merchant ID,15,31,112,126
+Secondary Bit Map,8,32,127,134
+Authentication Indicator,1,33,135,135
+Advice Reason Code,3,34,136,138
+Advice Detail Code,4,35,139,142
+Assessment Score,3,36,143,145
+Score Reason Code,2,37,146,147
+Rules Score,3,38,148,150
+Rules Reason Code 1,2,39,151,152
+Rules Reason Code 2,2,40,153,154
+Airline Ticket Number,15,41,155,169
+CVC2 Validation Program Indicator,1,42,170,170
+QPS/Contactless Chargeback Eligibility Indicator,1,43,171,171
+mPOS Acceptance Device,1,44,172,172
+Terminal Capability Indicator,2,45,173,174
+Trace ID,15,46,175,189
+Merchant Country of Origin,3,47,190,192
+Merchant Payment Gateway ID,11,48,193,203
+Data Verification Type,2,49,204,205
+Transaction Link ID,22,50,206,227
