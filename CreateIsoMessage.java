@@ -2947,19 +2947,24 @@ public class CreateIsoMessage  {
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
             
+            // Add debug logging
+            System.out.println("DE 111 - Primary Bitmap Hex: " + primaryBitmapHex);
+            System.out.println("DE 111 - Primary Bitmap Binary: " + primaryBitmapBinary);
+            System.out.println("DE 111 - Bit 32 value: " + primaryBitmapBinary.charAt(31));
+            
             // Get config for format
             JsonNode formatConfig = fieldConfig.get("111").get("validation").get("rules").get("formatIdentifiers").get(formatIdentifier);
             if (formatConfig == null) {
                 result.addFailedField(de, expected, "Unsupported format identifier: " + formatIdentifier);
                 return false;
             }
-
+            
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
             
             // Process primary bitmap bits
             for (int bit = 1; bit <= 64; bit++) {
-                JsonNode fieldConfig = formatConfig.get("primaryBitmap").get("fields").get(String.valueOf(bit));
+                JsonNode fieldConfig = fieldConfig.get("111").get("validation").get("rules").get("formatIdentifiers").get(formatIdentifier).get("primaryBitmap").get("fields").get(String.valueOf(bit));
                 if (fieldConfig != null) {
                     int fieldLength = fieldConfig.get("length").asInt();
                     
@@ -3010,8 +3015,8 @@ public class CreateIsoMessage  {
                 }
             }
             
-            // Check if secondary bitmap is present (bit 1 of primary bitmap)
-            if (primaryBitmapBinary.charAt(0) == '1') {
+            // Check if secondary bitmap is present (bit 32 of primary bitmap)
+            if (primaryBitmapBinary.charAt(31) == '1') {
                 String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
                 String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
                 currentPos += 8;
@@ -3019,15 +3024,15 @@ public class CreateIsoMessage  {
                 // Process secondary bitmap bits
                 for (int bit = 1; bit <= 64; bit++) {
                     int actualBit = bit + 64;  // Adjust bit number for secondary bitmap
-                    JsonNode fieldConfig = formatConfig.get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
+                    JsonNode fieldConfig = fieldConfig.get("111").get("validation").get("rules").get("formatIdentifiers").get(formatIdentifier).get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
                     if (fieldConfig != null) {
                         int fieldLength = fieldConfig.get("length").asInt();
                         
-                        // If bit is set (1), validate the field
+                        // If bit is set (1), process the field
                         if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
                             String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                             
-                            // Only validate if this field has a canonical path
+                            // Validate if this field has a canonical path
                             if (fieldConfig.has("path")) {
                                 String canonicalPath = fieldConfig.get("path").asText();
                                 String actualValue = getJsonValue(actualJson, canonicalPath);
