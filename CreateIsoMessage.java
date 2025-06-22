@@ -3008,10 +3008,10 @@ public class CreateIsoMessage  {
                                 }
                             }
                         }
+                        // Move position increment inside bit check
+                        currentPos += fieldLength;
                     }
-                    
-                    // Always advance position by field length, whether bit is set or not
-                    currentPos += fieldLength;
+                    // Remove the position increment from here
                 }
             }
             
@@ -3032,7 +3032,7 @@ public class CreateIsoMessage  {
                     if (bitConfig != null) {
                         int fieldLength = bitConfig.get("length").asInt();
                         
-                        // If bit is set (1), process the field
+                        // If bit is set (1), process the field and advance position
                         if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
                             String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                             
@@ -3047,10 +3047,10 @@ public class CreateIsoMessage  {
                                     allValid = false;
                                 }
                             }
+                            // Advance position only for set bits
+                            currentPos += fieldLength;
                         }
-                        
-                        // Always advance position by field length, whether bit is set or not
-                        currentPos += fieldLength;
+                        // No else needed - we don't advance position for unset bits
                     }
                 }
             }
