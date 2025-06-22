@@ -3015,13 +3015,13 @@ public class CreateIsoMessage  {
             
             // Check if secondary bitmap is present (bit 32 of primary bitmap)
             if (primaryBitmapBinary.charAt(31) == '1') {
-                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 4);  // Changed from 8 to 4 bytes
+                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);  // 8 hex digits = 4 bytes = 32 bits
                 String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                currentPos += 4;  // Changed from 8 to 4
+                currentPos += 8;  // Advance by 8 hex digits
                 
                 // Process secondary bitmap bits (32 bits)
                 for (int bit = 1; bit <= 32; bit++) {
-                    int actualBit = bit + 32;  // Changed from 64 to 32 for correct field numbering
+                    int actualBit = bit + 32;  // Fields 33-64 for secondary bitmap
                     JsonNode bitConfig = formatConfig.get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
                     if (bitConfig != null) {
                         int fieldLength = bitConfig.get("length").asInt();
