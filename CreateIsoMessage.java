@@ -2945,9 +2945,6 @@ public class CreateIsoMessage  {
             // Get primary bitmap (positions 6-13)
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
-            
-            // Current position starts after bitmap
-            int currentPos = 13;
 
             // Get validation rules for this format
             JsonNode config = fieldConfig.get(de);
@@ -2966,10 +2963,11 @@ public class CreateIsoMessage  {
                 if (primaryBitmapBinary.charAt(bitPosition - 1) == '1') {
                     JsonNode fieldConfig = field.getValue();
                     String fieldName = fieldConfig.get("name").asText();
-                    int length = fieldConfig.get("length").asInt();
+                    int startPos = fieldConfig.get("startPos").asInt();
+                    int endPos = fieldConfig.get("endPos").asInt();
                     String path = fieldConfig.get("path").asText();
                     
-                    String expectedValue = expected.substring(currentPos, currentPos + length);
+                    String expectedValue = expected.substring(startPos - 1, endPos);
                     String actualValue = getJsonValue(actualJson, path);
                     
                     if (!expectedValue.equals(actualValue)) {
@@ -2977,17 +2975,21 @@ public class CreateIsoMessage  {
                               .append(", got ").append(actualValue).append("; ");
                         allValid = false;
                     }
-                    currentPos += length;
                 }
             }
 
             // Check for secondary bitmap
             if (primaryBitmapBinary.charAt(31) == '1') {
-                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
+                // Get secondary bitmap position from config
+                JsonNode secondaryBitmapConfig = formatRules.path("secondaryBitmap");
+                String[] positions = secondaryBitmapConfig.get("position").asText().split("-");
+                int bitmapStart = Integer.parseInt(positions[0]);
+                int bitmapEnd = Integer.parseInt(positions[1]);
+                
+                String secondaryBitmapHex = expected.substring(bitmapStart - 1, bitmapEnd);
                 String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                currentPos += 8;
 
-                JsonNode secondaryFields = formatRules.path("secondaryBitmap").path("fields");
+                JsonNode secondaryFields = secondaryBitmapConfig.path("fields");
                 for (Iterator<Map.Entry<String, JsonNode>> it = secondaryFields.fields(); it.hasNext();) {
                     Map.Entry<String, JsonNode> field = it.next();
                     int bitPosition = Integer.parseInt(field.getKey());
@@ -2995,10 +2997,11 @@ public class CreateIsoMessage  {
                     if (secondaryBitmapBinary.charAt(bitPosition - 1) == '1') {
                         JsonNode fieldConfig = field.getValue();
                         String fieldName = fieldConfig.get("name").asText();
-                        int length = fieldConfig.get("length").asInt();
+                        int startPos = fieldConfig.get("startPos").asInt();
+                        int endPos = fieldConfig.get("endPos").asInt();
                         String path = fieldConfig.get("path").asText();
                         
-                        String expectedValue = expected.substring(currentPos, currentPos + length);
+                        String expectedValue = expected.substring(startPos - 1, endPos);
                         String actualValue = getJsonValue(actualJson, path);
                         
                         if (!expectedValue.equals(actualValue)) {
@@ -3006,7 +3009,6 @@ public class CreateIsoMessage  {
                                   .append(", got ").append(actualValue).append("; ");
                             allValid = false;
                         }
-                        currentPos += length;
                     }
                 }
             }
