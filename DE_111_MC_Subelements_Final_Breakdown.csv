@@ -1,0 +1,57 @@
+Subelement Name,Data Length,Bit No,Start Position,End Position
+Format Identifier,2,,1,2
+Data Length,3,,3,5
+Data Byte Map,8,,6,13
+Merchant Advice Code,2,1,14,15
+"POS Entry Mode
+Response Code
+POS Data - POS Terminal Attendance
+POS Data - POS Cardholder Presence
+POS Data - Card-Activated Terminal Level
+POS Data - POS Card Data Terminal Input Capability",9,2,16,24
+Advice Detail Code,4,3,25,28
+Magnetic Stripe Compliance Status Indicator,1,4,29,29
+Magnetic Stripe Compliance Error Indicator,1,5,30,30
+Postal Code,10,6,31,40
+POS Card Presence,1,7,41,41
+Transaction Type Identifie,3,8,42,44
+MC Assigned ID,6,9,45,50
+MC Fraud On-Behalf (Service 18) Result,1,10,51,51
+MC Fraud Score Information,3,11,52,54
+MC Healthcare IIAS Exemption,1,12,55,55
+Processor Pseudo ICA,7,13,56,62
+Authorization System Advice Date and Time,10,14,63,72
+Account Data Compromise Event Messaging Service Data (Service 25) Result,1,15,73,73
+Account Data Compromise Event Messaging Service Data,30,16,74,103
+Partial Approval Terminal Support Indicator,1,17,104,104
+MC Fraud Score Reason Code,2,18,105,106
+POS Transaction Status Indicator,1,19,107,107
+Reserved,0,20,108,107
+Payment Initiation Channel Device Type,2,21,108,109
+UCAF Collection Indicator,0,22,110,109
+Transit Transaction Type Indicator,2,23,110,111
+Transportation Mode Indicator,2,24,112,113
+Wallet Identifier,3,25,114,116
+Final Auth Indicator,1,26,117,117
+Terminal Compliant Indicator,2,27,118,119
+"MC On-behalf (first of 26, 33, 51, 52, or 62) Service",2,28,120,121
+"MC On-behalf (first of 26, 33, 51, 52, or 62) Result",1,29,122,122
+Merchant Fraud Score,4,30,123,126
+Payment Facilitator ID,11,31,127,137
+Secondary Bit Map,8,32,138,145
+Authentication Indicator,11,33,146,156
+Sub Merchant ID,15,34,157,171
+Authentication Indicator,1,35,172,172
+Advice Reason Code,3,36,173,175
+Token Provisioning Message Type,2,37,176,177
+Merchant Transaction Fraud Scoring Indicator,1,38,178,178
+Rules Score,3,39,179,181
+Rule Season Code 1,2,40,182,183
+Rule Season Code 2,2,41,184,185
+MPOS Acceptance Data,1,42,186,186
+Additional Terminal Capability Indicator,2,43,187,188
+MC Service Parameter,1,44,189,189
+Merchant Country of Origin,3,45,190,192
+Merchant Payment Gateway ID,11,46,193,203
+Data Verification Type,2,47,204,205
+Transaction Link ID,22,48,206,227

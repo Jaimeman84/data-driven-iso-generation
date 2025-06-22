@@ -2064,7 +2064,219 @@
     "max_length": 225,
     "active": false,
     "SampleData": {
-      "MC": "MC012FFFFEBFF551234567891234226001311234012333355513330123456705071204252741852963741852963741852963741122i225599101188101123412345678912FFFF0000123456789121234567891234561040221123221122213331234567891222aRyU-3Ti981f_6WvBaqM03",
+      "MC": {
+        "paths": [
+          "transaction.additionalData.formatIdentifier",
+          "transaction.additionalData.address.zipCode",
+          "transaction.additionalData.isCnp",
+          "transaction.additionalData.mcAssignedId",
+          "transaction.additionalData.incrementalAuthIndicator",
+          "transaction.additionalData.finalAuthIndicator",
+          "transaction.additionalData.linkedTransactionId"
+        ],
+        "primaryBitmap": {
+          "position": "6-13",
+          "fields": {
+            "1": {
+              "name": "merchantAdviceCode",
+              "length": 2
+            },
+            "2": {
+              "name": "posData",
+              "length": 9
+            },
+            "3": {
+              "name": "adviceDetailCode",
+              "length": 4
+            },
+            "4": {
+              "name": "magneticStripeComplianceStatusIndicator",
+              "length": 1
+            },
+            "5": {
+              "name": "magneticStripeComplianceErrorIndicator",
+              "length": 1
+            },
+            "6": {
+              "name": "postalCode",
+              "length": 10
+            },
+            "7": {
+              "name": "posCardPresence",
+              "length": 1
+            },
+            "8": {
+              "name": "transactionTypeIdentifier",
+              "length": 3
+            },
+            "9": {
+              "name": "mcAssignedId",
+              "length": 6
+            },
+            "10": {
+              "name": "mcFraudOnBehalfResult",
+              "length": 1
+            },
+            "11": {
+              "name": "mcFraudScoreInformation",
+              "length": 3
+            },
+            "12": {
+              "name": "mcHealthcareIIASExemption",
+              "length": 1
+            },
+            "13": {
+              "name": "processorPseudoICA",
+              "length": 7
+            },
+            "14": {
+              "name": "authorizationSystemAdviceDateTime",
+              "length": 10
+            },
+            "15": {
+              "name": "accountDataCompromiseEventMessagingServiceResult",
+              "length": 1
+            },
+            "16": {
+              "name": "accountDataCompromiseEventMessagingServiceData",
+              "length": 30
+            },
+            "17": {
+              "name": "partialApprovalTerminalSupportIndicator",
+              "length": 1
+            },
+            "18": {
+              "name": "mcFraudScoreReasonCode",
+              "length": 2
+            },
+            "19": {
+              "name": "posTransactionStatusIndicator",
+              "length": 1
+            },
+            "20": {
+              "name": "reserved",
+              "length": 0
+            },
+            "21": {
+              "name": "paymentInitiationChannelDeviceType",
+              "length": 2
+            },
+            "22": {
+              "name": "ucafCollectionIndicator",
+              "length": 0
+            },
+            "23": {
+              "name": "transitTransactionTypeIndicator",
+              "length": 2
+            },
+            "24": {
+              "name": "transportationModeIndicator",
+              "length": 2
+            },
+            "25": {
+              "name": "walletIdentifier",
+              "length": 3
+            },
+            "26": {
+              "name": "finalAuthIndicator",
+              "length": 1
+            },
+            "27": {
+              "name": "terminalCompliantIndicator",
+              "length": 2
+            },
+            "28": {
+              "name": "mcOnBehalfService",
+              "length": 2
+            },
+            "29": {
+              "name": "mcOnBehalfResult",
+              "length": 1
+            },
+            "30": {
+              "name": "merchantFraudScore",
+              "length": 4
+            },
+            "31": {
+              "name": "paymentFacilitatorId",
+              "length": 11
+            },
+            "32": {
+              "name": "secondaryBitmap",
+              "length": 8
+            }
+          }
+        },
+        "secondaryBitmap": {
+          "position": "138-145",
+          "fields": {
+            "33": {
+              "name": "authenticationIndicator",
+              "length": 11
+            },
+            "34": {
+              "name": "subMerchantId",
+              "length": 15
+            },
+            "35": {
+              "name": "authenticationIndicator",
+              "length": 1
+            },
+            "36": {
+              "name": "adviceReasonCode",
+              "length": 3
+            },
+            "37": {
+              "name": "tokenProvisioningMessageType",
+              "length": 2
+            },
+            "38": {
+              "name": "merchantTransactionFraudScoringIndicator",
+              "length": 1
+            },
+            "39": {
+              "name": "rulesScore",
+              "length": 3
+            },
+            "40": {
+              "name": "ruleSeasonCode1",
+              "length": 2
+            },
+            "41": {
+              "name": "ruleSeasonCode2",
+              "length": 2
+            },
+            "42": {
+              "name": "mposAcceptanceData",
+              "length": 1
+            },
+            "43": {
+              "name": "additionalTerminalCapabilityIndicator",
+              "length": 2
+            },
+            "44": {
+              "name": "mcServiceParameter",
+              "length": 1
+            },
+            "45": {
+              "name": "merchantCountryOfOrigin",
+              "length": 3
+            },
+            "46": {
+              "name": "merchantPaymentGatewayId",
+              "length": 11
+            },
+            "47": {
+              "name": "dataVerificationType",
+              "length": 2
+            },
+            "48": {
+              "name": "transactionLinkId",
+              "length": 22
+            }
+          }
+        }
+      },
       "MD": "MD053DFE60041333555NXMS0010059001100004000dtsviQ6qT-mkEVM4r1YWvw"
     },
     "validation": {
@@ -2085,34 +2297,128 @@
               "position": "6-13",
               "fields": {
                 "1": {
-                  "name": "mcAssignedId",
-                  "length": 6,
-                  "path": "transaction.additionalData.mcAssignedId"
+                  "name": "merchantAdviceCode",
+                  "length": 2
+                },
+                "2": {
+                  "name": "posData",
+                  "length": 9
+                },
+                "3": {
+                  "name": "adviceDetailCode",
+                  "length": 4
+                },
+                "4": {
+                  "name": "magneticStripeComplianceStatusIndicator",
+                  "length": 1
+                },
+                "5": {
+                  "name": "magneticStripeComplianceErrorIndicator",
+                  "length": 1
                 },
                 "6": {
-                  "name": "zipCode",
-                  "length": 10,
-                  "path": "transaction.additionalData.address.zipCode"
+                  "name": "postalCode",
+                  "length": 10
                 },
                 "7": {
-                  "name": "isCnp",
-                  "length": 1,
-                  "path": "transaction.additionalData.isCnp"
+                  "name": "posCardPresence",
+                  "length": 1
+                },
+                "8": {
+                  "name": "transactionTypeIdentifier",
+                  "length": 3
                 },
                 "9": {
                   "name": "mcAssignedId",
-                  "length": 6,
-                  "path": "transaction.additionalData.mcAssignedId"
+                  "length": 6
+                },
+                "10": {
+                  "name": "mcFraudOnBehalfResult",
+                  "length": 1
+                },
+                "11": {
+                  "name": "mcFraudScoreInformation",
+                  "length": 3
+                },
+                "12": {
+                  "name": "mcHealthcareIIASExemption",
+                  "length": 1
+                },
+                "13": {
+                  "name": "processorPseudoICA",
+                  "length": 7
+                },
+                "14": {
+                  "name": "authorizationSystemAdviceDateTime",
+                  "length": 10
+                },
+                "15": {
+                  "name": "accountDataCompromiseEventMessagingServiceResult",
+                  "length": 1
+                },
+                "16": {
+                  "name": "accountDataCompromiseEventMessagingServiceData",
+                  "length": 30
+                },
+                "17": {
+                  "name": "partialApprovalTerminalSupportIndicator",
+                  "length": 1
+                },
+                "18": {
+                  "name": "mcFraudScoreReasonCode",
+                  "length": 2
                 },
                 "19": {
-                  "name": "incrementalAuthIndicator",
-                  "length": 1,
-                  "path": "transaction.additionalData.incrementalAuthIndicator"
+                  "name": "posTransactionStatusIndicator",
+                  "length": 1
+                },
+                "20": {
+                  "name": "reserved",
+                  "length": 0
+                },
+                "21": {
+                  "name": "paymentInitiationChannelDeviceType",
+                  "length": 2
+                },
+                "22": {
+                  "name": "ucafCollectionIndicator",
+                  "length": 0
+                },
+                "23": {
+                  "name": "transitTransactionTypeIndicator",
+                  "length": 2
+                },
+                "24": {
+                  "name": "transportationModeIndicator",
+                  "length": 2
+                },
+                "25": {
+                  "name": "walletIdentifier",
+                  "length": 3
                 },
                 "26": {
                   "name": "finalAuthIndicator",
-                  "length": 1,
-                  "path": "transaction.additionalData.finalAuthIndicator"
+                  "length": 1
+                },
+                "27": {
+                  "name": "terminalCompliantIndicator",
+                  "length": 2
+                },
+                "28": {
+                  "name": "mcOnBehalfService",
+                  "length": 2
+                },
+                "29": {
+                  "name": "mcOnBehalfResult",
+                  "length": 1
+                },
+                "30": {
+                  "name": "merchantFraudScore",
+                  "length": 4
+                },
+                "31": {
+                  "name": "paymentFacilitatorId",
+                  "length": 11
                 },
                 "32": {
                   "name": "secondaryBitmap",
@@ -2121,12 +2427,71 @@
               }
             },
             "secondaryBitmap": {
-              "position": "32",
+              "position": "138-145",
               "fields": {
-                "16": {
-                  "name": "linkedTransactionId",
-                  "length": 22,
-                  "path": "transaction.additionalData.linkedTransactionId"
+                "33": {
+                  "name": "authenticationIndicator",
+                  "length": 11
+                },
+                "34": {
+                  "name": "subMerchantId",
+                  "length": 15
+                },
+                "35": {
+                  "name": "authenticationIndicator",
+                  "length": 1
+                },
+                "36": {
+                  "name": "adviceReasonCode",
+                  "length": 3
+                },
+                "37": {
+                  "name": "tokenProvisioningMessageType",
+                  "length": 2
+                },
+                "38": {
+                  "name": "merchantTransactionFraudScoringIndicator",
+                  "length": 1
+                },
+                "39": {
+                  "name": "rulesScore",
+                  "length": 3
+                },
+                "40": {
+                  "name": "ruleSeasonCode1",
+                  "length": 2
+                },
+                "41": {
+                  "name": "ruleSeasonCode2",
+                  "length": 2
+                },
+                "42": {
+                  "name": "mposAcceptanceData",
+                  "length": 1
+                },
+                "43": {
+                  "name": "additionalTerminalCapabilityIndicator",
+                  "length": 2
+                },
+                "44": {
+                  "name": "mcServiceParameter",
+                  "length": 1
+                },
+                "45": {
+                  "name": "merchantCountryOfOrigin",
+                  "length": 3
+                },
+                "46": {
+                  "name": "merchantPaymentGatewayId",
+                  "length": 11
+                },
+                "47": {
+                  "name": "dataVerificationType",
+                  "length": 2
+                },
+                "48": {
+                  "name": "transactionLinkId",
+                  "length": 22
                 }
               }
             }
@@ -2147,8 +2512,7 @@
               "fields": {
                 "1": {
                   "name": "mcAssignedId",
-                  "length": 6,
-                  "path": "transaction.additionalData.mcAssignedId"
+                  "length": 6
                 },
                 "2": {
                   "name": "crossBorderIndicator",
@@ -2169,8 +2533,7 @@
                 },
                 "6": {
                   "name": "operatingEnvironment",
-                  "length": 1,
-                  "path": "transaction.additionalData.operatingEnvironment"
+                  "length": 1
                 },
                 "7": {
                   "name": "terminalAttendance",
@@ -2190,8 +2553,7 @@
                 },
                 "11": {
                   "name": "posEntryMode",
-                  "length": 2,
-                  "path": "transaction.additionalData.posEntryMode"
+                  "length": 2
                 },
                 "12": {
                   "name": "transactionType",
@@ -2207,8 +2569,7 @@
                 },
                 "15": {
                   "name": "posTransactionStatus",
-                  "length": 1,
-                  "path": "transaction.additionalData.posTransactionStatus"
+                  "length": 1
                 },
                 "16": {
                   "name": "reserved2",
@@ -2223,8 +2584,8 @@
                   "length": 2
                 },
                 "19": {
-                  "name": "transportationMode",
-                  "length": 2
+                  "name": "incrementalAuthIndicator",
+                  "length": 1
                 },
                 "20": {
                   "name": "maestroPinless",
@@ -2252,8 +2613,7 @@
                 },
                 "26": {
                   "name": "finalAuthIndicator",
-                  "length": 1,
-                  "path": "transaction.additionalData.finalAuthIndicator"
+                  "length": 1
                 },
                 "27": {
                   "name": "allPointSurchargeIndicator",
@@ -2354,8 +2714,7 @@
                 },
                 "50": {
                   "name": "linkedTransactionId",
-                  "length": 22,
-                  "path": "transaction.additionalData.linkedTransactionId"
+                  "length": 22
                 }
               }
             }
