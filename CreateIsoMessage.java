@@ -2974,10 +2974,10 @@ public class CreateIsoMessage  {
                         
                         // Only validate if this field has a canonical path
                         if (bitConfig.has("path")) {
-                            String canonicalPath = bitConfig.get("path").asText();
+                            String canonicalPath = "transaction.additionalData." + formatIdentifier + "." + bitConfig.get("path").asText();
                             
                             // Special handling for isCnp
-                            if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
+                            if (bit == 5 && canonicalPath.endsWith("isCnp")) {
                                 // For isCnp: 0 = true, 1 = not present
                                 if (fieldValue.equals("0")) {
                                     String actualValue = getJsonValue(actualJson, canonicalPath);
@@ -3008,16 +3008,19 @@ public class CreateIsoMessage  {
                                 }
                             }
                         }
-                        currentPos += fieldLength;
+                        // Only advance position if it's not bit 32 (secondary bitmap indicator)
+                        if (bit != 32) {
+                            currentPos += fieldLength;
+                        }
                     }
                 }
             }
             
             // Check if secondary bitmap is present (bit 32 of primary bitmap)
             if (primaryBitmapBinary.charAt(31) == '1') {
-                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);  // 8 hex digits = 4 bytes = 32 bits
+                String secondaryBitmapHex = expected.substring(currentPos, currentPos + 8);
                 String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                currentPos += 8;  // Advance by 8 hex digits
+                currentPos += 8;  // Advance by 8 hex digits after reading secondary bitmap
                 
                 // Process secondary bitmap bits (32 bits)
                 for (int bit = 1; bit <= 32; bit++) {
@@ -3032,7 +3035,7 @@ public class CreateIsoMessage  {
                             
                             // Validate if this field has a canonical path
                             if (bitConfig.has("path")) {
-                                String canonicalPath = bitConfig.get("path").asText();
+                                String canonicalPath = "transaction.additionalData." + formatIdentifier + "." + bitConfig.get("path").asText();
                                 String actualValue = getJsonValue(actualJson, canonicalPath);
                                 
                                 if (!fieldValue.equals(actualValue)) {
