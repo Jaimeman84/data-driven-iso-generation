@@ -2084,6 +2084,11 @@
             "primaryBitmap": {
               "position": "6-13",
               "fields": {
+                "1": {
+                  "name": "mcAssignedId",
+                  "length": 6,
+                  "path": "transaction.additionalData.mcAssignedId"
+                },
                 "6": {
                   "name": "zipCode",
                   "length": 10,
@@ -2108,6 +2113,10 @@
                   "name": "finalAuthIndicator",
                   "length": 1,
                   "path": "transaction.additionalData.finalAuthIndicator"
+                },
+                "32": {
+                  "name": "secondaryBitmap",
+                  "length": 8
                 }
               }
             },
@@ -2245,6 +2254,30 @@
                   "name": "finalAuthIndicator",
                   "length": 1,
                   "path": "transaction.additionalData.finalAuthIndicator"
+                },
+                "27": {
+                  "name": "allPointSurchargeIndicator",
+                  "length": 1
+                },
+                "28": {
+                  "name": "merchantFraudScore",
+                  "length": 4
+                },
+                "29": {
+                  "name": "paymentFacilitatorId",
+                  "length": 11
+                },
+                "30": {
+                  "name": "salesOrganizationId",
+                  "length": 11
+                },
+                "31": {
+                  "name": "subMerchantId",
+                  "length": 15
+                },
+                "32": {
+                  "name": "secondaryBitmap",
+                  "length": 8
                 }
               }
             },

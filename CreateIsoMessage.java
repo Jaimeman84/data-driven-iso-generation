@@ -2955,7 +2955,7 @@ public class CreateIsoMessage  {
             }
 
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
-            int currentPos = 14;
+            int currentPos = 13;
             
             // Process primary bitmap bits
             for (int bit = 1; bit <= 64; bit++) {
