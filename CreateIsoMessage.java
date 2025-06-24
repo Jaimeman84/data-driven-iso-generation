@@ -2229,7 +2229,10 @@ public class CreateIsoMessage  {
 
             // Validate Debit/Credit Indicator (position 8)
             String indicator = expected.substring(7, 8);
-            String expectedIndicator = amountComponent.get("components").get("debitCreditIndicator").get("mapping").get(indicator).asText();
+            JsonNode components = amountComponent.path("components");
+            JsonNode debitCreditIndicatoType = components.path("debitCreditIndicatorType");
+            JsonNode mapping = debitCreditIndicator.path("mapping");
+            String expectedIndicator = mapping.path(indicator).asText();
             String actualIndicator = amount.path("amount").path("debitCreditIndicatorType").asText();
             boolean indicatorValid = expectedIndicator.equals(actualIndicator);
             validationDetails.append(String.format("D/C Indicator: %s->%s (%s), ",
