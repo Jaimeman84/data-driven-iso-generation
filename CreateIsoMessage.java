@@ -2954,6 +2954,52 @@ public class CreateIsoMessage  {
                 return false;
             }
 
+            // Get primary bitmap from positions 6-13 (8 hex digits = 32 bits)
+            String primaryBitmapHex = expected.substring(5, 13);
+            String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
+            
+            // Filter canonical paths based on bitmap
+            List<String> canonicalPaths = getCanonicalPaths("111");
+            JsonNode paths = formatConfig.get("paths");
+            JsonNode fields = formatConfig.path("primaryBitmap").path("fields");
+            
+            // Create a map of field names to their canonical paths
+            Map<String, String> fieldNameToPath = new HashMap<>();
+            if (paths.isArray()) {
+                Iterator<JsonNode> pathIter = paths.elements();
+                while (pathIter.hasNext()) {
+                    String path = pathIter.next().asText();
+                    String fieldName = path.substring(path.lastIndexOf(".") + 1);
+                    fieldNameToPath.put(fieldName.toLowerCase(), path);
+                }
+            }
+            
+            // Remove paths that don't correspond to set bits in the bitmap
+            canonicalPaths.removeIf(path -> {
+                String fieldName = path.substring(path.lastIndexOf(".") + 1).toLowerCase();
+                // Keep format identifier path and paths that match set bits
+                if (fieldName.equals("formatidentifier")) {
+                    return false;
+                }
+                // Check each field in the bitmap config
+                for (Iterator<String> it = fields.fieldNames(); it.hasNext();) {
+                    String bitNum = it.next();
+                    JsonNode field = fields.get(bitNum);
+                    if (field.has("name") && 
+                        field.get("name").asText().toLowerCase().equals(fieldName) && 
+                        primaryBitmapBinary.charAt(Integer.parseInt(bitNum) - 1) == '1') {
+                        return false;
+                    }
+                }
+                return true;
+            });
+            
+            // Update the config with filtered paths
+            JsonNode config = fieldConfig.get("111");
+            ((ObjectNode) config).put("canonical", objectMapper.valueToTree(canonicalPaths));
+
+            // Continue with existing validation logic...
+
             // Get the list of valid paths for this format
             JsonNode validPaths = formatConfig.get("paths");
             if (validPaths == null || !validPaths.isArray()) {
