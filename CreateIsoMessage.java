@@ -2976,6 +2976,43 @@ public class CreateIsoMessage  {
             System.out.println("DE 111 - Primary Bitmap Hex: " + primaryBitmapHex);
             System.out.println("DE 111 - Primary Bitmap Binary: " + primaryBitmapBinary);
             
+            // Filter fieldPaths based on bitmap values
+            Map<String, String> activeFieldPaths = new HashMap<>();
+            
+            // Process primary bitmap to find active fields
+            for (int bit = 1; bit <= 32; bit++) {
+                if (primaryBitmapBinary.charAt(bit - 1) == '1') {
+                    JsonNode bitConfig = formatConfig.get("primaryBitmap").get("fields").get(String.valueOf(bit));
+                    if (bitConfig != null) {
+                        String fieldName = bitConfig.get("name").asText();
+                        if (fieldPaths.containsKey(fieldName)) {
+                            activeFieldPaths.put(fieldName, fieldPaths.get(fieldName));
+                        }
+                    }
+                }
+            }
+            
+            // If secondary bitmap is present, process it too
+            if (primaryBitmapBinary.charAt(31) == '1') {
+                String secondaryBitmapHex = expected.substring(13, 21);
+                String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+                for (int bit = 1; bit <= 32; bit++) {
+                    if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
+                        int actualBit = bit + 32;
+                        JsonNode bitConfig = formatConfig.get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
+                        if (bitConfig != null) {
+                            String fieldName = bitConfig.get("name").asText();
+                            if (fieldPaths.containsKey(fieldName)) {
+                                activeFieldPaths.put(fieldName, fieldPaths.get(fieldName));
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Replace original fieldPaths with filtered activeFieldPaths
+            fieldPaths = activeFieldPaths;
+
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
             
