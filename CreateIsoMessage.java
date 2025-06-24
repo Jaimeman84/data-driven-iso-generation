@@ -2969,15 +2969,56 @@ public class CreateIsoMessage  {
                 fieldPaths.put(fieldName, path);
             });
 
-            // Get primary bitmap (positions 6-13)
+            // Filter canonical paths based on bitmap before validation
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
+            List<String> canonicalPaths = new ArrayList<>(getCanonicalPaths(de));
+            Map<String, Integer> pathToFieldMapping = new HashMap<>();
             
-            System.out.println("DE 111 - Primary Bitmap Hex: " + primaryBitmapHex);
-            System.out.println("DE 111 - Primary Bitmap Binary: " + primaryBitmapBinary);
+            if ("MC".equals(formatIdentifier)) {
+                pathToFieldMapping.put("transaction.additionalData.address.zipCode", 6);
+                pathToFieldMapping.put("transaction.additionalData.isCnp", 7);
+                pathToFieldMapping.put("transaction.additionalData.mcAssignedId", 9);
+                pathToFieldMapping.put("transaction.additionalData.finalAuthIndicator", 26);
+                if (primaryBitmapBinary.charAt(31) == '1') {
+                    pathToFieldMapping.put("transaction.additionalData.linkedTransactionId", 48);
+                }
+            } else if ("MD".equals(formatIdentifier)) {
+                pathToFieldMapping.put("transaction.additionalData.mcAssignedId", 1);
+                pathToFieldMapping.put("transaction.additionalData.isCnp", 5);
+                pathToFieldMapping.put("transaction.additionalData.operatingEnvironment", 6);
+                pathToFieldMapping.put("transaction.additionalData.posEntryMode", 11);
+                pathToFieldMapping.put("transaction.additionalData.posTransactionStatus", 15);
+                pathToFieldMapping.put("transaction.additionalData.finalAuthIndicator", 26);
+                if (primaryBitmapBinary.charAt(31) == '1') {
+                    pathToFieldMapping.put("transaction.additionalData.linkedTransactionId", 50);
+                }
+            }
+
+            // Remove paths that don't have corresponding bits set
+            canonicalPaths.removeIf(path -> {
+                Integer fieldNum = pathToFieldMapping.get(path);
+                if (fieldNum == null) return false;
+                
+                if (fieldNum <= 32) {
+                    return primaryBitmapBinary.charAt(fieldNum - 1) != '1';
+                } else if (primaryBitmapBinary.charAt(31) == '1') {
+                    String secondaryBitmapHex = expected.substring(13, 21);
+                    String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+                    return secondaryBitmapBinary.charAt(fieldNum - 33) != '1';
+                }
+                return true;
+            });
+
+            // Update config with filtered paths
+            JsonNode config = fieldConfig.get(de);
+            ((ObjectNode) config).put("canonical", objectMapper.valueToTree(canonicalPaths));
+
             
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
+
+            
             
             // Process primary bitmap bits (32 bits)
             for (int bit = 1; bit <= 32; bit++) {
