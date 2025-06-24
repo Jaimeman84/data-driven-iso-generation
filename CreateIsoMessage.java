@@ -2962,7 +2962,7 @@ public class CreateIsoMessage  {
             }
 
             // Create a map of field names to their canonical paths
-            Map<String, String> fieldPaths = new HashMap<>();
+            final Map<String, String> fieldPaths = new HashMap<>();
             validPaths.forEach(pathNode -> {
                 String path = pathNode.asText();
                 String fieldName = path.substring(path.lastIndexOf(".") + 1);
@@ -2977,7 +2977,7 @@ public class CreateIsoMessage  {
             System.out.println("DE 111 - Primary Bitmap Binary: " + primaryBitmapBinary);
             
             // Filter fieldPaths based on bitmap values
-            Map<String, String> activeFieldPaths = new HashMap<>();
+            final Map<String, String> activeFieldPaths = new HashMap<>();
             
             // Process primary bitmap to find active fields
             for (int bit = 1; bit <= 32; bit++) {
@@ -3009,9 +3009,6 @@ public class CreateIsoMessage  {
                     }
                 }
             }
-            
-            // Replace original fieldPaths with filtered activeFieldPaths
-            fieldPaths = activeFieldPaths;
 
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
@@ -3027,9 +3024,9 @@ public class CreateIsoMessage  {
                     if (primaryBitmapBinary.charAt(bit - 1) == '1') {
                         String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                         
-                        // Only validate if this field has a path in the paths array
-                        if (fieldPaths.containsKey(fieldName)) {
-                            String canonicalPath = fieldPaths.get(fieldName);
+                        // Only validate if this field has a path in the active paths array
+                        if (activeFieldPaths.containsKey(fieldName)) {
+                            String canonicalPath = activeFieldPaths.get(fieldName);
                             
                             // Special handling for isCnp
                             if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
