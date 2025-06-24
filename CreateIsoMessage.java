@@ -2954,61 +2954,65 @@ public class CreateIsoMessage  {
                 return false;
             }
 
-            // Get the list of valid paths for this format
-            JsonNode validPaths = formatConfig.get("paths");
-            if (validPaths == null || !validPaths.isArray()) {
-                result.addFailedField(de, expected, "Invalid format configuration - missing paths array");
-                return false;
-            }
-
-            // Create a map of field names to their canonical paths
-            final Map<String, String> fieldPaths = new HashMap<>();
-            validPaths.forEach(pathNode -> {
-                String path = pathNode.asText();
-                String fieldName = path.substring(path.lastIndexOf(".") + 1);
-                fieldPaths.put(fieldName, path);
-            });
-
             // Get primary bitmap (positions 6-13)
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
             
-            System.out.println("DE 111 - Primary Bitmap Hex: " + primaryBitmapHex);
-            System.out.println("DE 111 - Primary Bitmap Binary: " + primaryBitmapBinary);
+            // Get secondary bitmap if present
+            String secondaryBitmapBinary = "";
+            if (primaryBitmapBinary.charAt(31) == '1') {
+                String secondaryBitmapHex = expected.substring(13, 21);
+                secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+            }
+
+            // Create a set of active field names based on bitmap values
+            Set<String> activeFields = new HashSet<>();
             
-            // Filter fieldPaths based on bitmap values
-            final Map<String, String> activeFieldPaths = new HashMap<>();
-            
-            // Process primary bitmap to find active fields
+            // Check primary bitmap bits
             for (int bit = 1; bit <= 32; bit++) {
                 if (primaryBitmapBinary.charAt(bit - 1) == '1') {
                     JsonNode bitConfig = formatConfig.get("primaryBitmap").get("fields").get(String.valueOf(bit));
-                    if (bitConfig != null) {
-                        String fieldName = bitConfig.get("name").asText();
-                        if (fieldPaths.containsKey(fieldName)) {
-                            activeFieldPaths.put(fieldName, fieldPaths.get(fieldName));
-                        }
+                    if (bitConfig != null && bitConfig.has("name")) {
+                        activeFields.add(bitConfig.get("name").asText());
                     }
                 }
             }
             
-            // If secondary bitmap is present, process it too
-            if (primaryBitmapBinary.charAt(31) == '1') {
-                String secondaryBitmapHex = expected.substring(13, 21);
-                String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+            // Check secondary bitmap bits if present
+            if (!secondaryBitmapBinary.isEmpty()) {
                 for (int bit = 1; bit <= 32; bit++) {
                     if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
                         int actualBit = bit + 32;
                         JsonNode bitConfig = formatConfig.get("secondaryBitmap").get("fields").get(String.valueOf(actualBit));
-                        if (bitConfig != null) {
-                            String fieldName = bitConfig.get("name").asText();
-                            if (fieldPaths.containsKey(fieldName)) {
-                                activeFieldPaths.put(fieldName, fieldPaths.get(fieldName));
-                            }
+                        if (bitConfig != null && bitConfig.has("name")) {
+                            activeFields.add(bitConfig.get("name").asText());
                         }
                     }
                 }
             }
+
+            // Filter validPaths to only include paths for active fields
+            JsonNode validPaths = formatConfig.get("paths");
+            List<String> filteredPaths = new ArrayList<>();
+            if (validPaths != null && validPaths.isArray()) {
+                validPaths.forEach(pathNode -> {
+                    String path = pathNode.asText();
+                    String fieldName = path.substring(path.lastIndexOf(".") + 1);
+                    if (activeFields.contains(fieldName)) {
+                        filteredPaths.add(path);
+                    }
+                });
+            }
+
+            // Update the config with filtered paths
+            ((ObjectNode) formatConfig).set("paths", objectMapper.valueToTree(filteredPaths));
+
+            // Create a map of field names to their canonical paths using filtered paths
+            Map<String, String> fieldPaths = new HashMap<>();
+            filteredPaths.forEach(path -> {
+                String fieldName = path.substring(path.lastIndexOf(".") + 1);
+                fieldPaths.put(fieldName, path);
+            });
 
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
@@ -3024,9 +3028,9 @@ public class CreateIsoMessage  {
                     if (primaryBitmapBinary.charAt(bit - 1) == '1') {
                         String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                         
-                        // Only validate if this field has a path in the active paths array
-                        if (activeFieldPaths.containsKey(fieldName)) {
-                            String canonicalPath = activeFieldPaths.get(fieldName);
+                        // Only validate if this field has a path in the paths array
+                        if (fieldPaths.containsKey(fieldName)) {
+                            String canonicalPath = fieldPaths.get(fieldName);
                             
                             // Special handling for isCnp
                             if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
