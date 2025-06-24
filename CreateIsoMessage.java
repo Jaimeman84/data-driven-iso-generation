@@ -3178,4 +3178,216 @@ public class CreateIsoMessage  {
             row.createCell(6).setCellValue(details.toString());
         }
     }
+
+    /**
+     * Parses an ISO8583 message and populates a spreadsheet with the field values
+     * @param isoMessage The ISO8583 message to parse
+     * @param filePath The Excel spreadsheet file path to update
+     * @throws IOException If there are issues reading/writing the file
+     */
+    public static void generateSpreadsheetFromIso(String isoMessage, String filePath) throws IOException {
+        System.out.println("\n=== Starting spreadsheet generation from ISO message ===");
+        System.out.println("ISO Message: " + isoMessage);
+        
+        // Load the ISO configuration
+        loadConfig("iso_config.json");
+        
+        // Parse MTI (first 4 characters)
+        String mti = isoMessage.substring(0, 4);
+        int currentPos = 4;
+        
+        // Parse primary bitmap (next 16 characters)
+        String primaryBitmapHex = isoMessage.substring(currentPos, currentPos + 16);
+        String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
+        currentPos += 16;
+        
+        // Check if secondary bitmap is present (first bit of primary bitmap)
+        boolean hasSecondaryBitmap = primaryBitmapBinary.charAt(0) == '1';
+        String secondaryBitmapBinary = "";
+        if (hasSecondaryBitmap) {
+            String secondaryBitmapHex = isoMessage.substring(currentPos, currentPos + 16);
+            secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+            currentPos += 16;
+        }
+        
+        // Store parsed fields
+        Map<String, String> parsedFields = new HashMap<>();
+        parsedFields.put("MTI", mti);
+        
+        // Parse fields based on primary bitmap
+        for (int i = 0; i < 64; i++) {
+            if (primaryBitmapBinary.charAt(i) == '1') {
+                int fieldNum = i + 1;
+                if (fieldNum == 1) continue; // Skip secondary bitmap indicator
+                
+                JsonNode fieldConfig = fieldConfig.get(String.valueOf(fieldNum));
+                if (fieldConfig == null) {
+                    System.out.println("Warning: No configuration found for DE" + fieldNum);
+                    continue;
+                }
+                
+                String fieldValue = extractFieldValue(isoMessage, currentPos, fieldConfig);
+                parsedFields.put(String.valueOf(fieldNum), fieldValue);
+                
+                // Update position based on field length
+                if (fieldConfig.has("format")) {
+                    String format = fieldConfig.get("format").asText();
+                    if ("llvar".equals(format)) {
+                        currentPos += 2 + Integer.parseInt(isoMessage.substring(currentPos, currentPos + 2));
+                    } else if ("lllvar".equals(format)) {
+                        currentPos += 3 + Integer.parseInt(isoMessage.substring(currentPos, currentPos + 3));
+                    } else {
+                        currentPos += fieldConfig.get("length").asInt();
+                    }
+                } else {
+                    currentPos += fieldConfig.get("length").asInt();
+                }
+            }
+        }
+        
+        // Parse fields based on secondary bitmap if present
+        if (hasSecondaryBitmap) {
+            for (int i = 0; i < 64; i++) {
+                if (secondaryBitmapBinary.charAt(i) == '1') {
+                    int fieldNum = i + 65;
+                    JsonNode fieldConfig = fieldConfig.get(String.valueOf(fieldNum));
+                    if (fieldConfig == null) {
+                        System.out.println("Warning: No configuration found for DE" + fieldNum);
+                        continue;
+                    }
+                    
+                    String fieldValue = extractFieldValue(isoMessage, currentPos, fieldConfig);
+                    parsedFields.put(String.valueOf(fieldNum), fieldValue);
+                    
+                    // Update position based on field length
+                    if (fieldConfig.has("format")) {
+                        String format = fieldConfig.get("format").asText();
+                        if ("llvar".equals(format)) {
+                            currentPos += 2 + Integer.parseInt(isoMessage.substring(currentPos, currentPos + 2));
+                        } else if ("lllvar".equals(format)) {
+                            currentPos += 3 + Integer.parseInt(isoMessage.substring(currentPos, currentPos + 3));
+                        } else {
+                            currentPos += fieldConfig.get("length").asInt();
+                        }
+                    } else {
+                        currentPos += fieldConfig.get("length").asInt();
+                    }
+                }
+            }
+        }
+        
+        // Open the Excel workbook
+        try (FileInputStream fis = new FileInputStream(filePath);
+             Workbook workbook = new XSSFWorkbook(fis)) {
+            
+            // Get the "Auth STIP Integration" sheet
+            Sheet sheet = workbook.getSheet("Auth STIP Integration");
+            if (sheet == null) {
+                sheet = workbook.createSheet("Auth STIP Integration");
+            }
+            
+            // Get or create header row
+            Row headerRow = sheet.getRow(0);
+            if (headerRow == null) {
+                headerRow = sheet.createRow(0);
+            }
+            
+            // Create a new data row
+            int newRowIndex = sheet.getLastRowNum() + 1;
+            Row newRow = sheet.createRow(newRowIndex);
+            
+            // Map column indices to DE numbers
+            Map<Integer, String> columnToDE = new HashMap<>();
+            for (int i = 0; i <= headerRow.getLastCellNum(); i++) {
+                Cell headerCell = headerRow.getCell(i);
+                if (headerCell != null) {
+                    String headerValue = getCellValueAsString(headerCell).trim();
+                    if (!headerValue.isEmpty()) {
+                        columnToDE.put(i, headerValue);
+                    }
+                }
+            }
+            
+            // Populate the row with parsed values
+            for (Map.Entry<Integer, String> entry : columnToDE.entrySet()) {
+                int columnIndex = entry.getKey();
+                String de = entry.getValue();
+                String value = parsedFields.get(de);
+                
+                if (value != null) {
+                    Cell cell = newRow.createCell(columnIndex);
+                    
+                    // Get field configuration for proper formatting
+                    JsonNode fieldConfig = fieldConfig.get(de);
+                    if (fieldConfig != null && fieldConfig.has("type")) {
+                        String dataType = fieldConfig.get("type").asText();
+                        setCellValueWithType(cell, value, dataType);
+                    } else {
+                        cell.setCellValue(value);
+                    }
+                }
+            }
+            
+            // Add ISO message to column CL
+            Cell isoMessageCell = newRow.createCell(89); // Column CL
+            isoMessageCell.setCellValue(isoMessage);
+            
+            // Save the workbook
+            try (FileOutputStream fos = new FileOutputStream(filePath)) {
+                workbook.write(fos);
+                System.out.println("\nSuccessfully wrote parsed ISO message to spreadsheet at row " + (newRowIndex + 1));
+            }
+            
+        } catch (Exception e) {
+            System.err.println("\nError processing spreadsheet: " + e.getMessage());
+            e.printStackTrace();
+            throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Extracts a field value from the ISO message based on its configuration
+     */
+    private static String extractFieldValue(String isoMessage, int startPos, JsonNode fieldConfig) {
+        if (fieldConfig.has("format")) {
+            String format = fieldConfig.get("format").asText();
+            if ("llvar".equals(format)) {
+                int length = Integer.parseInt(isoMessage.substring(startPos, startPos + 2));
+                return isoMessage.substring(startPos + 2, startPos + 2 + length);
+            } else if ("lllvar".equals(format)) {
+                int length = Integer.parseInt(isoMessage.substring(startPos, startPos + 3));
+                return isoMessage.substring(startPos + 3, startPos + 3 + length);
+            }
+        }
+        
+        int length = fieldConfig.get("length").asInt();
+        return isoMessage.substring(startPos, startPos + length);
+    }
+    
+    /**
+     * Sets a cell value with appropriate type conversion
+     */
+    private static void setCellValueWithType(Cell cell, String value, String dataType) {
+        try {
+            switch (dataType.toLowerCase()) {
+                case "numeric":
+                    cell.setCellValue(Double.parseDouble(value));
+                    break;
+                case "date":
+                    // Assuming date format MMddHHmmss
+                    if (value.length() == 10) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMddHHmmss");
+                        cell.setCellValue(sdf.parse(value));
+                    } else {
+                        cell.setCellValue(value);
+                    }
+                    break;
+                default:
+                    cell.setCellValue(value);
+            }
+        } catch (Exception e) {
+            // If conversion fails, store as string
+            cell.setCellValue(value);
+        }
+    }
 }

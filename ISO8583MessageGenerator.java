@@ -41,4 +41,9 @@ public class ISO8583MessageGenerator {
         generateIsoFromSpreadsheet(filePath);
     }
 
+    @When("^I parse ISO message \"([^\"]*)\" into spreadsheet \"([^\"]*)\"$")
+    public void i_parse_iso_message_into_spreadsheet(String isoMessage, String filePath) throws IOException {
+        generateSpreadsheetFromIso(isoMessage, filePath);
+    }
+
 }
