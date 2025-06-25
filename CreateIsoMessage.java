@@ -1854,6 +1854,12 @@ public class CreateIsoMessage  {
      */
     private static boolean validatePosConditionCode(String de, String expected, String actual, ValidationResult result, JsonNode rules) {
         try {
+            // For lllvar format, skip the length indicator (first 3 characters)
+            String data = expected;
+            if (expected.length() > 3 && fieldConfig.get("58").get("format").asText().equals("lllvar")) {
+                data = expected.substring(3);
+            }
+
             JsonNode actualJson = objectMapper.readTree(actual);
             JsonNode positions = rules.get("positions");
             boolean allValid = true;
@@ -1861,7 +1867,7 @@ public class CreateIsoMessage  {
 
             // Validate Terminal Class
             JsonNode terminalClass = positions.get("terminalClass");
-            String terminalClassValue = expected.substring(
+            String terminalClassValue = data.substring(
                 terminalClass.get("start").asInt() - 1,
                 terminalClass.get("end").asInt()
             );
@@ -1882,7 +1888,7 @@ public class CreateIsoMessage  {
 
             // Validate Presentation Type
             JsonNode presentationType = positions.get("presentationType");
-            String presentationValue = expected.substring(
+            String presentationValue = data.substring(
                 presentationType.get("start").asInt() - 1,
                 presentationType.get("end").asInt()
             );
@@ -1902,7 +1908,7 @@ public class CreateIsoMessage  {
 
             // Validate Security Condition
             JsonNode securityCondition = positions.get("securityCondition");
-            String securityValue = expected.substring(
+            String securityValue = data.substring(
                 securityCondition.get("position").asInt() - 1,
                 securityCondition.get("position").asInt()
             );
@@ -1912,7 +1918,7 @@ public class CreateIsoMessage  {
 
             // Validate Terminal Type
             JsonNode terminalType = positions.get("terminalType");
-            String terminalTypeValue = expected.substring(
+            String terminalTypeValue = data.substring(
                 terminalType.get("start").asInt() - 1,
                 terminalType.get("end").asInt()
             );
@@ -1922,7 +1928,7 @@ public class CreateIsoMessage  {
 
             // Validate Card Data Input Capability
             JsonNode cardDataInput = positions.get("cardDataInputCapability");
-            String cardDataValue = expected.substring(
+            String cardDataValue = data.substring(
                 cardDataInput.get("position").asInt() - 1,
                 cardDataInput.get("position").asInt()
             );
