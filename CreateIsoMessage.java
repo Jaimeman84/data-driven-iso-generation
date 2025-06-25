@@ -2926,7 +2926,7 @@ public class CreateIsoMessage  {
      */
     private static boolean validateAdditionalData(String de, String expected, String actual, ValidationResult result) {
         try {
-            if (expected == null || expected.length() < 14) {
+            if (expected == null || expected.length() < 14) { // Must have at least format identifier, length, and bitmap
                 result.addFailedField(de, expected, "Invalid DE 111 length");
                 return false;
             }
@@ -2935,8 +2935,12 @@ public class CreateIsoMessage  {
             StringBuilder details = new StringBuilder();
             boolean allValid = true;
 
+            // Get format identifier (MC or MD) - positions 1-2
             String formatIdentifier = expected.substring(0, 2);
             String actualFormatIdentifier = getJsonValue(actualJson, "transaction.additionalData.formatIdentifier");
+            
+            System.out.println("DE 111 - Total length: " + expected.length());
+            System.out.println("DE 111 - Format Identifier: " + formatIdentifier);
             
             if (!formatIdentifier.equals(actualFormatIdentifier)) {
                 result.addFailedField(de, formatIdentifier, actualFormatIdentifier);
@@ -2950,48 +2954,20 @@ public class CreateIsoMessage  {
                 return false;
             }
 
-            // Get the list of valid paths and create a mutable copy
-            List<String> validPaths = new ArrayList<>();
-            formatConfig.get("paths").forEach(path -> validPaths.add(path.asText()));
-
-            // Get primary bitmap and remove paths for unset bits
-            String primaryBitmapHex = expected.substring(5, 13);
-            String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
-            JsonNode primaryFields = formatConfig.get("primaryBitmap").get("fields");
-            
-            // Remove paths for unset primary bitmap bits
-            for (Iterator<String> it = primaryFields.fieldNames(); it.hasNext();) {
-                String bitStr = it.next();
-                int bit = Integer.parseInt(bitStr);
-                if (bit <= 32 && primaryBitmapBinary.charAt(bit - 1) != '1') {
-                    JsonNode field = primaryFields.get(bitStr);
-                    if (field.has("path")) {
-                        validPaths.remove(field.get("path").asText());
-                    }
-                }
+            // Get the list of valid paths for this format
+            JsonNode validPaths = formatConfig.get("paths");
+            if (validPaths == null || !validPaths.isArray()) {
+                result.addFailedField(de, expected, "Invalid format configuration - missing paths array");
+                return false;
             }
 
-            // Check secondary bitmap if present
-            if (primaryBitmapBinary.charAt(31) == '1') {
-                String secondaryBitmapHex = expected.substring(13, 21);
-                String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                JsonNode secondaryFields = formatConfig.get("secondaryBitmap").get("fields");
-                
-                // Remove paths for unset secondary bitmap bits
-                for (Iterator<String> it = secondaryFields.fieldNames(); it.hasNext();) {
-                    String bitStr = it.next();
-                    int bit = Integer.parseInt(bitStr) - 32;
-                    if (bit <= 32 && secondaryBitmapBinary.charAt(bit - 1) != '1') {
-                        JsonNode field = secondaryFields.get(bitStr);
-                        if (field.has("path")) {
-                            validPaths.remove(field.get("path").asText());
-                        }
-                    }
-                }
-            }
-
-            // Update config with filtered paths
-            ((ObjectNode) fieldConfig.get(de)).put("canonical", objectMapper.valueToTree(validPaths));
+            // Create a map of field names to their canonical paths
+            Map<String, String> fieldPaths = new HashMap<>();
+            validPaths.forEach(pathNode -> {
+                String path = pathNode.asText();
+                String fieldName = path.substring(path.lastIndexOf(".") + 1);
+                fieldPaths.put(fieldName, path);
+            });
 
             // Get primary bitmap (positions 6-13)
             String primaryBitmapHex = expected.substring(5, 13);
@@ -3015,8 +2991,8 @@ public class CreateIsoMessage  {
                         String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                         
                         // Only validate if this field has a path in the paths array
-                        if (validPaths.contains(fieldName)) {
-                            String canonicalPath = fieldName;
+                        if (fieldPaths.containsKey(fieldName)) {
+                            String canonicalPath = fieldPaths.get(fieldName);
                             
                             // Special handling for isCnp
                             if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
@@ -3077,8 +3053,8 @@ public class CreateIsoMessage  {
                             String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                             
                             // Validate if this field has a path in the paths array
-                            if (validPaths.contains(fieldName)) {
-                                String canonicalPath = fieldName;
+                            if (fieldPaths.containsKey(fieldName)) {
+                                String canonicalPath = fieldPaths.get(fieldName);
                                 String actualValue = getJsonValue(actualJson, canonicalPath);
                                 
                                 if (!fieldValue.equals(actualValue)) {
