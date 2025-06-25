@@ -2106,7 +2106,8 @@
                 },
                 "6": {
                   "name": "postalCode",
-                  "length": 10
+                  "length": 10,
+                  "path": "transaction.additionalData.address.zipCode"
                 },
                 "7": {
                   "name": "posCardPresence",
