@@ -2926,7 +2926,7 @@ public class CreateIsoMessage  {
      */
     private static boolean validateAdditionalData(String de, String expected, String actual, ValidationResult result) {
         try {
-            if (expected == null || expected.length() < 14) { // Must have at least format identifier, length, and bitmap
+            if (expected == null || expected.length() < 14) {
                 result.addFailedField(de, expected, "Invalid DE 111 length");
                 return false;
             }
@@ -2961,65 +2961,63 @@ public class CreateIsoMessage  {
                 return false;
             }
 
-            // Create a map of field names to their canonical paths
-            Map<String, String> fieldPaths = new HashMap<>();
-            validPaths.forEach(pathNode -> {
-                String path = pathNode.asText();
-                String fieldName = path.substring(path.lastIndexOf(".") + 1);
-                fieldPaths.put(fieldName, path);
-            });
-
-            // Filter canonical paths based on bitmap before validation
+            // Get primary bitmap
             String primaryBitmapHex = expected.substring(5, 13);
             String primaryBitmapBinary = hexToBinary(primaryBitmapHex);
-            List<String> canonicalPaths = new ArrayList<>(getCanonicalPaths(de));
-            Map<String, Integer> pathToFieldMapping = new HashMap<>();
             
-            if ("MC".equals(formatIdentifier)) {
-                pathToFieldMapping.put("transaction.additionalData.address.zipCode", 6);
-                pathToFieldMapping.put("transaction.additionalData.isCnp", 7);
-                pathToFieldMapping.put("transaction.additionalData.mcAssignedId", 9);
-                pathToFieldMapping.put("transaction.additionalData.finalAuthIndicator", 26);
-                if (primaryBitmapBinary.charAt(31) == '1') {
-                    pathToFieldMapping.put("transaction.additionalData.linkedTransactionId", 48);
-                }
-            } else if ("MD".equals(formatIdentifier)) {
-                pathToFieldMapping.put("transaction.additionalData.mcAssignedId", 1);
-                pathToFieldMapping.put("transaction.additionalData.isCnp", 5);
-                pathToFieldMapping.put("transaction.additionalData.operatingEnvironment", 6);
-                pathToFieldMapping.put("transaction.additionalData.posEntryMode", 11);
-                pathToFieldMapping.put("transaction.additionalData.posTransactionStatus", 15);
-                pathToFieldMapping.put("transaction.additionalData.finalAuthIndicator", 26);
-                if (primaryBitmapBinary.charAt(31) == '1') {
-                    pathToFieldMapping.put("transaction.additionalData.linkedTransactionId", 50);
+            // Create a map of field numbers to their canonical paths
+            Map<Integer, String> fieldNumberToPaths = new HashMap<>();
+            JsonNode primaryFields = formatConfig.get("primaryBitmap").get("fields");
+            for (Iterator<String> it = primaryFields.fieldNames(); it.hasNext();) {
+                String fieldNum = it.next();
+                JsonNode field = primaryFields.get(fieldNum);
+                if (field.has("path")) {
+                    fieldNumberToPaths.put(Integer.parseInt(fieldNum), field.get("path").asText());
                 }
             }
 
-            // Remove paths that don't have corresponding bits set
-            canonicalPaths.removeIf(path -> {
-                Integer fieldNum = pathToFieldMapping.get(path);
-                if (fieldNum == null) return false;
-                
-                if (fieldNum <= 32) {
-                    return primaryBitmapBinary.charAt(fieldNum - 1) != '1';
-                } else if (primaryBitmapBinary.charAt(31) == '1') {
-                    String secondaryBitmapHex = expected.substring(13, 21);
-                    String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
-                    return secondaryBitmapBinary.charAt(fieldNum - 33) != '1';
+            // Add secondary bitmap fields if present
+            if (primaryBitmapBinary.charAt(31) == '1') {
+                JsonNode secondaryFields = formatConfig.get("secondaryBitmap").get("fields");
+                for (Iterator<String> it = secondaryFields.fieldNames(); it.hasNext();) {
+                    String fieldNum = it.next();
+                    JsonNode field = secondaryFields.get(fieldNum);
+                    if (field.has("path")) {
+                        fieldNumberToPaths.put(Integer.parseInt(fieldNum), field.get("path").asText());
+                    }
                 }
-                return true;
+            }
+
+            // Filter canonical paths based on bitmap
+            List<String> canonicalPaths = new ArrayList<>(getCanonicalPaths(de));
+            canonicalPaths.removeIf(path -> {
+                // Keep paths that don't have field mappings
+                boolean hasMapping = false;
+                for (Map.Entry<Integer, String> entry : fieldNumberToPaths.entrySet()) {
+                    if (entry.getValue().equals(path)) {
+                        hasMapping = true;
+                        int fieldNum = entry.getKey();
+                        // Remove if bit is not set
+                        if (fieldNum <= 32) {
+                            return primaryBitmapBinary.charAt(fieldNum - 1) != '1';
+                        } else if (primaryBitmapBinary.charAt(31) == '1') {
+                            String secondaryBitmapHex = expected.substring(13, 21);
+                            String secondaryBitmapBinary = hexToBinary(secondaryBitmapHex);
+                            return secondaryBitmapBinary.charAt(fieldNum - 33) != '1';
+                        }
+                        return true;
+                    }
+                }
+                return !hasMapping; // Keep paths without mappings
             });
 
             // Update config with filtered paths
             JsonNode config = fieldConfig.get(de);
             ((ObjectNode) config).put("canonical", objectMapper.valueToTree(canonicalPaths));
 
-            
             // Start processing from position 14 (after format identifier, length, and primary bitmap)
             int currentPos = 13;
 
-            
-            
             // Process primary bitmap bits (32 bits)
             for (int bit = 1; bit <= 32; bit++) {
                 JsonNode bitConfig = formatConfig.get("primaryBitmap").get("fields").get(String.valueOf(bit));
@@ -3031,32 +3029,12 @@ public class CreateIsoMessage  {
                     if (primaryBitmapBinary.charAt(bit - 1) == '1') {
                         String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                         
-                        // Only validate if this field has a path in the paths array
-                        if (fieldPaths.containsKey(fieldName)) {
-                            String canonicalPath = fieldPaths.get(fieldName);
-                            
+                        // Get canonical path for this field
+                        String canonicalPath = fieldNumberToPaths.get(bit);
+                        if (canonicalPath != null) {
                             // Special handling for isCnp
                             if (bit == 5 && "transaction.additionalData.isCnp".equals(canonicalPath)) {
-                                // For isCnp: 0 = true, 1 = not present
-                                if (fieldValue.equals("0")) {
-                                    String actualValue = getJsonValue(actualJson, canonicalPath);
-                                    if (!"true".equals(actualValue)) {
-                                        details.append(String.format("Field %d (isCnp) mismatch: expected=true, actual=%s; ", 
-                                            bit, actualValue));
-                                        allValid = false;
-                                    }
-                                } else if (fieldValue.equals("1")) {
-                                    // isCnp should not be present in the object
-                                    if (actualJson.at(canonicalPath).isNull() || actualJson.at(canonicalPath).isMissingNode()) {
-                                        // This is correct - field should not be present
-                                    } else {
-                                        details.append(String.format("Field %d (isCnp) error: should not be present when value is 1; ", bit));
-                                        allValid = false;
-                                    }
-                                } else {
-                                    details.append(String.format("Field %d (isCnp) invalid value: %s; ", bit, fieldValue));
-                                    allValid = false;
-                                }
+                                validateIsCnp(fieldValue, actualJson, canonicalPath, bit, details);
                             } else {
                                 // Normal validation for other fields
                                 String actualValue = getJsonValue(actualJson, canonicalPath);
@@ -3067,6 +3045,7 @@ public class CreateIsoMessage  {
                                 }
                             }
                         }
+                        
                         // Only advance position if it's not bit 32 (secondary bitmap indicator)
                         if (bit != 32) {
                             currentPos += fieldLength;
@@ -3093,11 +3072,10 @@ public class CreateIsoMessage  {
                         if (secondaryBitmapBinary.charAt(bit - 1) == '1') {
                             String fieldValue = expected.substring(currentPos, currentPos + fieldLength);
                             
-                            // Validate if this field has a path in the paths array
-                            if (fieldPaths.containsKey(fieldName)) {
-                                String canonicalPath = fieldPaths.get(fieldName);
+                            // Get canonical path for this field
+                            String canonicalPath = fieldNumberToPaths.get(actualBit);
+                            if (canonicalPath != null) {
                                 String actualValue = getJsonValue(actualJson, canonicalPath);
-                                
                                 if (!fieldValue.equals(actualValue)) {
                                     details.append(String.format("Field %d (%s) mismatch: expected=%s, actual=%s; ", 
                                         actualBit, fieldName, fieldValue, actualValue));
@@ -3121,6 +3099,28 @@ public class CreateIsoMessage  {
         } catch (Exception e) {
             result.addFailedField(de, expected, "Error validating DE 111: " + e.getMessage());
             return false;
+        }
+    }
+
+    // Helper method to validate isCnp field
+    private static void validateIsCnp(String fieldValue, JsonNode actualJson, String canonicalPath, int bit, StringBuilder details) {
+        // For isCnp: 0 = true, 1 = not present
+        if (fieldValue.equals("0")) {
+            String actualValue = getJsonValue(actualJson, canonicalPath);
+            if (!"true".equals(actualValue)) {
+                details.append(String.format("Field %d (isCnp) mismatch: expected=true, actual=%s; ", 
+                    bit, actualValue));
+                allValid = false;
+            }
+        } else if (fieldValue.equals("1")) {
+            // isCnp should not be present in the object
+            if (!actualJson.at(canonicalPath).isNull() && !actualJson.at(canonicalPath).isMissingNode()) {
+                details.append(String.format("Field %d (isCnp) error: should not be present when value is 1; ", bit));
+                allValid = false;
+            }
+        } else {
+            details.append(String.format("Field %d (isCnp) invalid value: %s; ", bit, fieldValue));
+            allValid = false;
         }
     }
     
