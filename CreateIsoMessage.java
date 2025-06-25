@@ -2995,18 +2995,21 @@ public class CreateIsoMessage  {
                             String canonicalPath = fieldPaths.get(fieldName);
                             
                             // Special handling for isCnp
-                            if ((formatIdentifier.equals("MD") && bit == 5 || formatIdentifier.equals("MC") && bit == 7) 
-                                && "transaction.additionalData.isCnp".equals(canonicalPath)) {
-                                // For isCnp: 0 = bit present (1) but attribute not in JSON, 1 = bit not present (0)
+                            if ((formatIdentifier.equals("MD") && bit == 5) || (formatIdentifier.equals("MC") && bit == 7) 
+                                    && "transaction.additionalData.isCnp".equals(canonicalPath)) {
+                                // For isCnp: 0 = true, 1 = not present
                                 if (fieldValue.equals("0")) {
-                                    // Value 0 means bit is set (1) but attribute should NOT be present in JSON
-                                    if (!actualJson.at(canonicalPath).isMissingNode()) {
-                                        details.append(String.format("Field %d (isCnp) error: should not be present when value is 0; ", bit));
+                                    String actualValue = getJsonValue(actualJson, canonicalPath);
+                                    if (!"true".equals(actualValue)) {
+                                        details.append(String.format("Field %d (isCnp) mismatch: expected=true, actual=%s; ", 
+                                            bit, actualValue));
                                         allValid = false;
                                     }
                                 } else if (fieldValue.equals("1")) {
-                                    // Value 1 means bit not set (0) and attribute should not be present
-                                    if (!actualJson.at(canonicalPath).isMissingNode()) {
+                                    // isCnp should not be present in the object
+                                    if (actualJson.at(canonicalPath).isNull() || actualJson.at(canonicalPath).isMissingNode()) {
+                                        // This is correct - field should not be present
+                                    } else {
                                         details.append(String.format("Field %d (isCnp) error: should not be present when value is 1; ", bit));
                                         allValid = false;
                                     }
