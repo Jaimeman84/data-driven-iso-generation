@@ -730,14 +730,14 @@ public class CreateIsoMessage  {
             // Skip validation for non-canonicalized fields
             if (isNonCanonicalized(de)) {
                 result.addSkippedField(de, expectedValue, getSkipReason(de));
-                continue;
-            }
+                    continue;
+                }
 
             // Special handling for DE 43 (Merchant Location)
             if (de.equals("43")) {
                 validateMerchantLocation(de, expectedValue, canonicalJson, result);
-                continue;
-            }
+                    continue;
+                }
 
             // Special handling for DE 95 (Replacement Amounts) when MTI is not 0420
             if (de.equals("95") && !isoFields.getOrDefault(0, "").equals("0420")) {
