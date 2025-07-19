@@ -44,7 +44,7 @@ public static void generateIsoFromSpreadsheet(String filePath) throws IOExceptio
 
 ### 3. Validation Features
 
-#### Configuration Structure
+#### Configuration Structure Sample
 ```json
 {
   "fields": {
