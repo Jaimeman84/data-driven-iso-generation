@@ -1,0 +1,238 @@
+package utilities;
+
+import lombok.Getter;
+import org.apache.poi.ss.usermodel.*;
+
+import java.util.*;
+
+public class ValidationResultManager {
+    /**
+     * Enum to represent field validation status
+     */
+    public enum FieldStatus {
+        PASSED("PASS"),
+        FAILED("FAIL"),
+        SKIPPED("SKIP"),
+        PENDING("PENDING");  // Added for fields waiting for their pair
+
+        private final String display;
+
+        FieldStatus(String display) {
+            this.display = display;
+        }
+
+        @Override
+        public String toString() {
+            return display;
+        }
+    }
+
+    /**
+     * Class to hold individual field validation results
+     */
+    public static class FieldResult {
+        private final FieldStatus status;
+        private final String expected;
+        private final String actual;
+
+        public FieldResult(FieldStatus status, String expected, String actual) {
+            this.status = status;
+            this.expected = expected;
+            this.actual = actual;
+        }
+
+        public FieldStatus getStatus() { return status; }
+        public String getExpected() { return expected; }
+        public String getActual() { return actual; }
+    }
+
+    /**
+     * Class to hold validation results
+     */
+    @Getter
+    public static class ValidationResult {
+        private final Map<String, FieldResult> results = new HashMap<>();
+
+        public void addPassedField(String de, String expected, String actual) {
+            results.put(de, new FieldResult(FieldStatus.PASSED, expected, actual));
+        }
+
+        public void addFailedField(String de, String expected, String actual) {
+            results.put(de, new FieldResult(FieldStatus.FAILED, expected, actual));
+        }
+
+        public void addSkippedField(String de, String expected, String reason) {
+            results.put(de, new FieldResult(FieldStatus.SKIPPED, expected, reason));
+        }
+
+        public void printResults() {
+            System.out.println("\n=== Validation Results ===");
+            System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n", "DE", "Status", "ISO Value", "Canonical Value", "Mapping");
+            System.out.println("-".repeat(120));
+
+            // Create a sorted map with custom comparator for numeric DE sorting
+            Map<String, FieldResult> sortedResults = new TreeMap<>((de1, de2) -> {
+                // Handle MTI specially
+                if (de1.equals("MTI")) return -1;
+                if (de2.equals("MTI")) return 1;
+
+                // Convert DEs to integers for numeric comparison
+                try {
+                    int num1 = Integer.parseInt(de1);
+                    int num2 = Integer.parseInt(de2);
+                    return Integer.compare(num1, num2);
+                } catch (NumberFormatException e) {
+                    // Fallback to string comparison if parsing fails
+                    return de1.compareTo(de2);
+                }
+            });
+            sortedResults.putAll(results);
+
+            // Print the sorted results
+            sortedResults.forEach((de, result) -> {
+                try {
+                    // Format ISO value to show original value and any paired values
+                    String isoValue = result.getExpected();
+
+                    // Format canonical value with any relevant conversion info
+                    String canonicalValue = result.getActual();
+
+                    System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n",
+                            de,
+                            result.getStatus().toString(),
+                            truncateOrPad(isoValue, 40),
+                            truncateOrPad(canonicalValue, 40),
+                            "See mapping in config"
+                    );
+                } catch (Exception e) {
+                    // If there's an error formatting a specific row, print it with error info
+                    System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n",
+                            de,
+                            "ERROR",
+                            "Error formatting result",
+                            e.getMessage(),
+                            "Error"
+                    );
+                }
+            });
+
+            // Print summary
+            long passCount = results.values().stream()
+                    .filter(r -> r.getStatus() == FieldStatus.PASSED)
+                    .count();
+            long failCount = results.values().stream()
+                    .filter(r -> r.getStatus() == FieldStatus.FAILED)
+                    .count();
+            long skipCount = results.values().stream()
+                    .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
+                    .count();
+
+            System.out.println("\nSummary:");
+            System.out.println("Total Fields: " + results.size());
+            System.out.println("Passed: " + passCount);
+            System.out.println("Failed: " + failCount);
+            System.out.println("Skipped: " + skipCount + (skipCount > 0 ? " (Fields not canonicalized or requiring special handling)" : ""));
+
+            // If there are skipped fields, show them and their reasons
+            if (skipCount > 0) {
+                System.out.println("\nSkipped Fields:");
+                results.entrySet().stream()
+                        .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                        .forEach(e -> System.out.printf("DE %s: %s%n", e.getKey(), e.getValue().getActual()));
+            }
+        }
+
+        private String truncateOrPad(String str, int length) {
+            if (str == null) {
+                return String.format("%-" + length + "s", "");
+            }
+            if (str.length() > length) {
+                return str.substring(0, length - 3) + "...";
+            }
+            return String.format("%-" + length + "s", str);
+        }
+    }
+
+    /**
+     * Exports validation results to a new sheet in the Excel workbook
+     */
+    public static void exportValidationResultsToExcel(Workbook workbook, ValidationResult results, int rowIndex) {
+        // Get or create the Validation Results sheet
+        Sheet validationSheet = workbook.getSheet("Validation Results");
+        if (validationSheet == null) {
+            validationSheet = workbook.createSheet("Validation Results");
+
+            // Create header row
+            Row headerRow = validationSheet.createRow(0);
+            String[] headers = {"Row #", "DE", "Status", "ISO Value", "Canonical Value", "Mapping", "Details"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+            }
+
+            // Set column widths
+            validationSheet.setColumnWidth(0, 10 * 256);  // Row #
+            validationSheet.setColumnWidth(1, 8 * 256);   // DE
+            validationSheet.setColumnWidth(2, 10 * 256);  // Status
+            validationSheet.setColumnWidth(3, 40 * 256);  // ISO Value
+            validationSheet.setColumnWidth(4, 40 * 256);  // Canonical Value
+            validationSheet.setColumnWidth(5, 50 * 256);  // Mapping
+            validationSheet.setColumnWidth(6, 60 * 256);  // Details
+        }
+
+        // Create a sorted map with custom comparator for numeric DE sorting
+        Map<String, FieldResult> sortedResults = new TreeMap<>((de1, de2) -> {
+            // Handle MTI specially
+            if (de1.equals("MTI")) return -1;
+            if (de2.equals("MTI")) return 1;
+
+            // Convert DEs to integers for numeric comparison
+            try {
+                int num1 = Integer.parseInt(de1);
+                int num2 = Integer.parseInt(de2);
+                return Integer.compare(num1, num2);
+            } catch (NumberFormatException e) {
+                return de1.compareTo(de2);
+            }
+        });
+        sortedResults.putAll(results.getResults());
+
+        // Add results for each DE
+        int currentRow = validationSheet.getLastRowNum() + 1;
+        for (Map.Entry<String, FieldResult> entry : sortedResults.entrySet()) {
+            String de = entry.getKey();
+            FieldResult result = entry.getValue();
+
+            Row row = validationSheet.createRow(currentRow++);
+
+            // Row number from original sheet
+            row.createCell(0).setCellValue("Row " + (rowIndex + 1));
+
+            // DE number
+            row.createCell(1).setCellValue(de);
+
+            // Status
+            Cell statusCell = row.createCell(2);
+            statusCell.setCellValue(result.getStatus().toString());
+
+            // ISO Value
+            row.createCell(3).setCellValue(result.getExpected());
+
+            // Canonical Value
+            String canonicalValue = result.getActual();
+            row.createCell(4).setCellValue(canonicalValue);
+
+            // Mapping
+            row.createCell(5).setCellValue("See config for mapping");
+
+            // Additional Details
+            StringBuilder details = new StringBuilder();
+            if (result.getStatus() == FieldStatus.FAILED) {
+                details.append("Validation failed: ").append(canonicalValue);
+            } else if (result.getStatus() == FieldStatus.SKIPPED) {
+                details.append("Skipped: ").append(canonicalValue);
+            }
+            row.createCell(6).setCellValue(details.toString());
+        }
+    }
+} 
