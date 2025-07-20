@@ -7,9 +7,14 @@ import io.cucumber.datatable.DataTable;
 import lombok.Getter;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import websocket.WebSocketClient;
+import websocket.WebSocketManager;
 
 import java.io.*;
 import java.math.BigDecimal;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
@@ -20,8 +25,6 @@ import static utilities.CustomTestData.generateCustomValue;
 import static utilities.CustomTestData.generateRandomText;
 import static utilities.DataElementSpecialCaseValidator.*;
 import static utilities.ValidationResultManager.*;
-import static utilities.CanonicalValidator.*;
-import static utilities.IsoMessageNetworkClient.*;
 
 public class CreateIsoMessage {
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -31,6 +34,9 @@ public class CreateIsoMessage {
     private static final boolean[] secondaryBitmap = new boolean[64];
     private static final Set<String> manuallyUpdatedFields = new HashSet<>(); // Tracks modified fields
     private static final String DEFAULT_MTI = "0100"; // Default MTI value
+    private static final String PARSER_URL = "replace with actual URL"; // Replace with actual URL
+    private static final String CANONICAL_URL = "replace with actual URL"; // Replace with actual URL
+    private static final String WS_URL = "replace with actual URL"; // Replace with actual URL
 
     public static void createIsoMessage(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
@@ -56,6 +62,7 @@ public class CreateIsoMessage {
         System.out.println(isoMessage);
         System.out.println("\nGenerated JSON Output:");
         System.out.println(jsonOutput);
+
     }
 
     public static void loadConfig(String filename) throws IOException {
@@ -408,12 +415,60 @@ public class CreateIsoMessage {
                 Arrays.fill(primaryBitmap, false);
                 Arrays.fill(secondaryBitmap, false);
 
-                // Extract DE values from the row
-                Map<String, String> deValues = extractDEValuesFromExcel(dataRow);
+                int processedFields = 0;
 
-                if (!deValues.isEmpty()) {
+                // Start from Column B (index 1) and go to Column CK (index 88)
+                for (int colNum = 1; colNum <= 88; colNum++) {
+                    // Get the Data Element Key from Row 1
+                    Cell headerCell = headerRow.getCell(colNum);
+                    String dataElementKey = getCellValueAsString(headerCell).trim();
+                    if (dataElementKey.isEmpty()) {
+                        continue;
+                    }
+
+                    // Get the data from current row
+                    Cell dataCell = dataRow.getCell(colNum);
+                    String cellValue;
+
+                    // Special handling for DE 60
+                    if (colNum == 58 || colNum == 60) {
+                        cellValue = getCellValueAsString(dataCell);
+                    } else {
+                        cellValue = getCellValueAsString(dataCell).trim();
+                    }
+
+                    if (cellValue.isEmpty()) {
+                        continue;
+                    }
+
+                    // Determine the data type from the configuration
+                    String dataType = "String"; // Default type
+                    JsonNode config = fieldConfig.get(dataElementKey);
+                    if (config != null && config.has("type")) {
+                        dataType = config.get("type").asText();
+                    }
+
+                    try {
+                        // Get the field name from configuration
+                        String fieldName;
+                        if (config != null && config.has("name")) {
+                            fieldName = config.get("name").asText();
+                        } else {
+                            System.out.println(" Warning: No field name found in configuration for key " + dataElementKey);
+                            fieldName = "Field_" + dataElementKey; // Fallback
+                        }
+
+                        // Apply the field update using the same logic as i_create_iso_message
+                        applyBddUpdate(fieldName, cellValue, dataType);
+                        processedFields++;
+                    } catch (Exception e) {
+                        System.out.println(" Status: Failed to process - " + e.getMessage());
+                    }
+                }
+
+                if (processedFields > 0) {
                     System.out.println("\n=== Row " + (rowIndex + 1) + " Processing Summary ===");
-                    System.out.println("Total fields processed: " + deValues.size());
+                    System.out.println("Total fields processed: " + processedFields);
 
                     // Generate default fields and build ISO message
                     generateDefaultFields();
@@ -426,32 +481,100 @@ public class CreateIsoMessage {
                     messageCell.setCellValue(isoMessage);
 
                     try {
-                        // Send message via WebSocket and get response
-                        String wsResponse = sendWebSocketMessage(isoMessage);
+                        WebSocketManager.init(WS_URL);
+                        WebSocketManager.sendMessage(isoMessage);
+                        String wsResponse = WebSocketClient.getResponseMessage();
+                        WebSocketManager.close();
 
                         // Parse response to get DE39
                         String parsedResponse = sendIsoMessageToParser(wsResponse);
                         JsonNode responseArray = objectMapper.readTree(parsedResponse);
 
                         // Extract DE39 (Response Code) from array
-                        String responseCode = extractResponseCode(responseArray);
-                        writeResponseCode(dataRow, responseCode);
+                        String responseCode = null;
+                        if (responseArray.isArray()) {
+                            // Iterate through array indices
+                            for (int i = 0; i < responseArray.size(); i++) {
+                                JsonNode element = responseArray.get(i);
+                                String elementId = element.get("dataElementId").asText();
+                                if ("39".equals(elementId)) {
+                                    responseCode = element.get("value").asText();
+                                    System.out.println("Found DE39 with value: " + responseCode);
+                                    break;
+                                }
+                            }
+                        }
 
+                        // Write response code to column CN
+                        Cell responseCell = dataRow.createCell(91); // Column CN
+                        if (responseCode != null) {
+                            JsonNode de39Config = fieldConfig.get("39");
+                            if (de39Config != null && de39Config.has("validation")) {
+                                JsonNode mapping = de39Config.get("validation").get("rules").get("mapping").get(responseCode);
+                                if (mapping != null) {
+                                    String description = mapping.get("description").asText();
+                                    String domain = mapping.get("domain").asText();
+                                    responseCell.setCellValue(String.format("%s - %s (%s)", responseCode, description, domain));
+                                } else {
+                                    responseCell.setCellValue(responseCode + " - Unknown response code");
+                                }
+                            } else {
+                                responseCell.setCellValue(responseCode);
+                            }
+                        } else {
+                            responseCell.setCellValue("No DE39 found in response");
+                        }
+                    } catch (Exception e) {
+                        System.out.println("\nWebSocket/Parser Error: " + e.getMessage());
+                        e.printStackTrace(); // Print full stack trace for debugging
+                        Cell responseCell = dataRow.createCell(92); // Column CN
+                        responseCell.setCellValue("Error: " + e.getMessage());
+                    }
+
+                    try {
                         // Validate against canonical form
-                        ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, deValues, fieldConfig, isoFields);
+                        ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, dataRow);
                         validationResult.printResults();
 
                         // Export validation results to Excel
                         exportValidationResultsToExcel(workbook, validationResult, rowIndex);
 
-                        // Write validation summary to spreadsheet
-                        writeValidationSummary(dataRow, validationResult);
+                        // Write validation results to the spreadsheet
+                        Cell validationCell = dataRow.createCell(90); // Column CM
+                        long passCount = validationResult.getResults().values().stream()
+                                .filter(r -> r.getStatus() == FieldStatus.PASSED)
+                                .count();
+                        long failCount = validationResult.getResults().values().stream()
+                                .filter(r -> r.getStatus() == FieldStatus.FAILED)
+                                .count();
+                        long skipCount = validationResult.getResults().values().stream()
+                                .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
+                                .count();
 
+                        // Get failed and skipped DEs
+                        String failedDEs = validationResult.getResults().entrySet().stream()
+                                .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
+                                .map(Map.Entry::getKey)
+                                .collect(Collectors.joining(", "));
+                        String skippedDEs = validationResult.getResults().entrySet().stream()
+                                .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                                .map(Map.Entry::getKey)
+                                .collect(Collectors.joining(", "));
+
+                        String validationSummary = String.format(
+                                "Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
+                                validationResult.getResults().size(),
+                                passCount,
+                                failCount,
+                                failCount > 0 ? " (DE " + failedDEs + ")" : "",
+                                skipCount,
+                                skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
+                        );
+                        validationCell.setCellValue(validationSummary);
                     } catch (Exception e) {
-                        System.out.println("\nError during processing: " + e.getMessage());
-                        e.printStackTrace();
-                        Cell responseCell = dataRow.createCell(91); // Column CN
-                        responseCell.setCellValue("Error: " + e.getMessage());
+                        System.out.println("\nValidation failed: " + e.getMessage());
+                        Cell validationCell = dataRow.createCell(90); // Column CM
+                        validationCell.setCellValue("Validation Error: " + e.getMessage());
                     }
                 } else {
                     System.out.println("\nNo fields processed for Row " + (rowIndex + 1) + " - skipping ISO message generation");
@@ -825,7 +948,7 @@ public class CreateIsoMessage {
      */
     private static Map<String, String> extractDEValuesFromExcel(Row row) {
         Map<String, String> deValues = new HashMap<>();
-        Row headerRow = row.getSheet().getRow(0); // Get header row from the sheet
+        Row headerRow = row.getSheet().getRow(0);
 
         for (int colNum = 1; colNum <= 88; colNum++) {
             Cell headerCell = headerRow.getCell(colNum);
@@ -842,201 +965,6 @@ public class CreateIsoMessage {
         }
 
         return deValues;
-    }
-
-    /**
-     * Extracts response code (DE39) from parser response
-     */
-    private static String extractResponseCode(JsonNode responseArray) {
-        if (responseArray.isArray()) {
-            for (int i = 0; i < responseArray.size(); i++) {
-                JsonNode element = responseArray.get(i);
-                String elementId = element.get("dataElementId").asText();
-                if ("39".equals(elementId)) {
-                    System.out.println("Found DE39 with value: " + element.get("value").asText());
-                    return element.get("value").asText();
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Writes response code to Excel
-     */
-    private static void writeResponseCode(Row row, String responseCode) {
-        Cell responseCell = row.createCell(91); // Column CN
-        if (responseCode != null) {
-            JsonNode de39Config = fieldConfig.get("39");
-            if (de39Config != null && de39Config.has("validation")) {
-                JsonNode mapping = de39Config.get("validation").get("rules").get("mapping").get(responseCode);
-                if (mapping != null) {
-                    String description = mapping.get("description").asText();
-                    String domain = mapping.get("domain").asText();
-                    responseCell.setCellValue(String.format("%s - %s (%s)", responseCode, description, domain));
-                } else {
-                    responseCell.setCellValue(responseCode + " - Unknown response code");
-                }
-            } else {
-                responseCell.setCellValue(responseCode);
-            }
-        } else {
-            responseCell.setCellValue("No DE39 found in response");
-        }
-    }
-
-    /**
-     * Writes validation summary to Excel
-     */
-    private static void writeValidationSummary(Row row, ValidationResult validationResult) {
-        Cell validationCell = row.createCell(90); // Column CM
-        long passCount = validationResult.getResults().values().stream()
-                .filter(r -> r.getStatus() == FieldStatus.PASSED)
-                .count();
-        long failCount = validationResult.getResults().values().stream()
-                .filter(r -> r.getStatus() == FieldStatus.FAILED)
-                .count();
-        long skipCount = validationResult.getResults().values().stream()
-                .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
-                .count();
-
-        // Get failed and skipped DEs
-        String failedDEs = validationResult.getResults().entrySet().stream()
-                .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.joining(", "));
-        String skippedDEs = validationResult.getResults().entrySet().stream()
-                .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.joining(", "));
-
-        String validationSummary = String.format(
-                "Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
-                validationResult.getResults().size(),
-                passCount,
-                failCount,
-                failCount > 0 ? " (DE " + failedDEs + ")" : "",
-                skipCount,
-                skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
-        );
-        validationCell.setCellValue(validationSummary);
-    }
-
-    // Update the call in generateIsoFromSpreadsheet
-    public static void generateIsoFromSpreadsheet(String filePath) throws IOException {
-        System.out.println("\n=== Starting ISO message generation and validation from spreadsheet ===");
-        System.out.println("File: " + filePath);
-
-        // Load the ISO configuration
-        loadConfig("iso_config.json");
-
-        // Open the Excel workbook
-        try (FileInputStream fis = new FileInputStream(filePath);
-             Workbook workbook = new XSSFWorkbook(fis)) {
-
-            Sheet sheet = workbook.getSheetAt(4);
-            String sheetName = sheet.getSheetName();
-            System.out.println("Found worksheet: " + sheetName);
-
-            if (!"Auth STIP Integration".equals(sheetName)) {
-                System.out.println("Warning: Expected sheet name 'Auth STIP Integration' but found '" + sheetName + "'");
-                System.out.println("Proceeding with processing anyway...");
-            }
-
-            // Get Row 1 for Data Element Keys
-            Row headerRow = sheet.getRow(0);
-            if (headerRow == null) {
-                throw new IOException("Header row (Row 1) not found in spreadsheet");
-            }
-
-            // Process from Row 6 (index 5) onwards
-            int totalRows = sheet.getLastRowNum();
-            System.out.println("\nProcessing rows 6 to " + (totalRows + 1));
-
-            // Create headers for ISO Message and Validation Results
-            Cell isoHeaderCell = headerRow.createCell(89); // Column CL
-            isoHeaderCell.setCellValue("Generated ISO Message");
-            Cell validationHeaderCell = headerRow.createCell(90); // Column CM
-            validationHeaderCell.setCellValue("Validation Results");
-            Cell de39HeaderCell = headerRow.createCell(91); // Column CN
-            de39HeaderCell.setCellValue("DE39 Response Code");
-
-            // Process each row starting from row 6
-            for (int rowIndex = 5; rowIndex <= totalRows; rowIndex++) {
-                Row dataRow = sheet.getRow(rowIndex);
-                if (dataRow == null) {
-                    System.out.println("\nSkipping empty row " + (rowIndex + 1));
-                    continue;
-                }
-
-                System.out.println("\n=== Processing Row " + (rowIndex + 1) + " ===");
-
-                // Clear previous field data for new row
-                isoFields.clear();
-                manuallyUpdatedFields.clear();
-                Arrays.fill(primaryBitmap, false);
-                Arrays.fill(secondaryBitmap, false);
-
-                // Extract DE values from the row
-                Map<String, String> deValues = extractDEValuesFromExcel(dataRow);
-
-                if (!deValues.isEmpty()) {
-                    System.out.println("\n=== Row " + (rowIndex + 1) + " Processing Summary ===");
-                    System.out.println("Total fields processed: " + deValues.size());
-
-                    // Generate default fields and build ISO message
-                    generateDefaultFields();
-                    String isoMessage = buildIsoMessage();
-                    System.out.println("\nGenerated ISO Message for Row " + (rowIndex + 1) + ":");
-                    System.out.println(isoMessage);
-
-                    // Write the ISO message to the spreadsheet
-                    Cell messageCell = dataRow.createCell(89); // Column CL
-                    messageCell.setCellValue(isoMessage);
-
-                    try {
-                        // Send message via WebSocket and get response
-                        String wsResponse = sendWebSocketMessage(isoMessage);
-
-                        // Parse response to get DE39
-                        String parsedResponse = sendIsoMessageToParser(wsResponse);
-                        JsonNode responseArray = objectMapper.readTree(parsedResponse);
-
-                        // Extract DE39 (Response Code) from array
-                        String responseCode = extractResponseCode(responseArray);
-                        writeResponseCode(dataRow, responseCode);
-
-                        // Validate against canonical form
-                        ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, deValues, fieldConfig, isoFields);
-                        validationResult.printResults();
-
-                        // Export validation results to Excel
-                        exportValidationResultsToExcel(workbook, validationResult, rowIndex);
-
-                        // Write validation summary to spreadsheet
-                        writeValidationSummary(dataRow, validationResult);
-
-                    } catch (Exception e) {
-                        System.out.println("\nError during processing: " + e.getMessage());
-                        e.printStackTrace();
-                        Cell responseCell = dataRow.createCell(91); // Column CN
-                        responseCell.setCellValue("Error: " + e.getMessage());
-                    }
-                } else {
-                    System.out.println("\nNo fields processed for Row " + (rowIndex + 1) + " - skipping ISO message generation");
-                }
-            }
-
-            // Save the workbook
-            try (FileOutputStream fos = new FileOutputStream(filePath)) {
-                workbook.write(fos);
-                System.out.println("\nSuccessfully wrote all ISO messages and validation results to spreadsheet");
-            }
-        } catch (Exception e) {
-            System.err.println("\nError processing spreadsheet: " + e.getMessage());
-            e.printStackTrace();
-            throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
-        }
     }
 
     /**
