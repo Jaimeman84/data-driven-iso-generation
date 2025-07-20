@@ -25,6 +25,7 @@ import static utilities.CustomTestData.generateCustomValue;
 import static utilities.CustomTestData.generateRandomText;
 import static utilities.DataElementSpecialCaseValidator.*;
 import static utilities.ValidationResultManager.*;
+import static utilities.IsoMessageTransport.*;
 
 public class CreateIsoMessage {
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -34,9 +35,6 @@ public class CreateIsoMessage {
     private static final boolean[] secondaryBitmap = new boolean[64];
     private static final Set<String> manuallyUpdatedFields = new HashSet<>(); // Tracks modified fields
     private static final String DEFAULT_MTI = "0100"; // Default MTI value
-    private static final String PARSER_URL = "replace with actual URL"; // Replace with actual URL
-    private static final String CANONICAL_URL = "replace with actual URL"; // Replace with actual URL
-    private static final String WS_URL = "replace with actual URL"; // Replace with actual URL
 
     public static void createIsoMessage(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
@@ -591,102 +589,6 @@ public class CreateIsoMessage {
             e.printStackTrace();
             throw new IOException("Failed to process spreadsheet: " + e.getMessage(), e);
         }
-    }
-
-    public static String sendIsoMessageToParser(String isoMessage) throws IOException {
-        URL url = new URL(PARSER_URL);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Content-Type", "text/plain");
-        connection.setDoOutput(true);
-
-        // Send the request
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = isoMessage.getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-        }
-
-        // Get response code
-        int responseCode = connection.getResponseCode();
-        StringBuilder response = new StringBuilder();
-
-        // Use error stream for 400 responses, input stream for successful responses
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(responseCode == 400
-                        ? connection.getErrorStream()
-                        : connection.getInputStream(), StandardCharsets.UTF_8))) {
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
-            }
-        }
-
-        // For 400 responses, try to parse the error message
-        if (responseCode == 400) {
-            try {
-                JsonNode errorNode = objectMapper.readTree(response.toString());
-                if (errorNode.has("message")) {
-                    return "Error: " + errorNode.get("message").asText();
-                } else if (errorNode.has("error")) {
-                    return "Error: " + errorNode.get("error").asText();
-                }
-            } catch (Exception e) {
-                // If can't parse as JSON, return raw response with Error prefix
-                return "Error: " + response;
-            }
-        }
-
-        return response.toString();
-    }
-
-    /**
-     * Sends an ISO8583 message to the canonical endpoint for validation
-     * @param isoMessage The ISO8583 message to convert to canonical form
-     * @return The canonical JSON response
-     */
-    public static String sendIsoMessageToCanonical(String isoMessage) throws IOException {
-        URL url = new URL(CANONICAL_URL);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Content-Type", "text/plain");
-        connection.setDoOutput(true);
-
-        // Send the request
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = isoMessage.getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-        }
-
-        // Get response code
-        int responseCode = connection.getResponseCode();
-        StringBuilder response = new StringBuilder();
-
-        // Use error stream for 400 responses, input stream for successful responses
-        try (BufferedReader br = new BufferedReader(
-                new InputStreamReader(responseCode == 400
-                        ? connection.getErrorStream()
-                        : connection.getInputStream(), StandardCharsets.UTF_8))) {
-            String responseLine;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
-            }
-        }
-
-        // For 400 responses, try to parse the error message
-        if (responseCode == 400) {
-            try {
-                JsonNode errorNode = objectMapper.readTree(response.toString());
-                if (errorNode.has("message")) {
-                    return "Error: " + errorNode.get("message").asText();
-                } else if (errorNode.has("error")) {
-                    return "Error: " + errorNode.get("error").asText();
-                }
-            } catch (Exception e) {
-                return "Error: " + response;
-            }
-        }
-
-        return response.toString();
     }
 
     /**
