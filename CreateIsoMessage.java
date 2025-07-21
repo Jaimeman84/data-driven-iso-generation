@@ -26,18 +26,20 @@ import static utilities.CustomTestData.generateRandomText;
 import static utilities.DataElementSpecialCaseValidator.*;
 import static utilities.ValidationResultManager.*;
 import static utilities.IsoMessageTransport.*;
+import static utilities.IsoBitmapManager.*;
 
 public class CreateIsoMessage {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     static Map<String, JsonNode> fieldConfig;
     static final Map<Integer, String> isoFields = new TreeMap<>();
-    private static final boolean[] primaryBitmap = new boolean[64];
-    private static final boolean[] secondaryBitmap = new boolean[64];
     private static final Set<String> manuallyUpdatedFields = new HashSet<>(); // Tracks modified fields
     private static final String DEFAULT_MTI = "0100"; // Default MTI value
 
     public static void createIsoMessage(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
+
+        // Reset bitmaps before starting
+        resetBitmaps();
 
         List<Map<String, String>> rows = dt.asMaps(String.class, String.class);
         for (Map<String, String> row : rows) {
@@ -156,12 +158,7 @@ public class CreateIsoMessage {
 
         // Store field value and update bitmap
         isoFields.put(fieldNumber, value);
-        if (fieldNumber <= 64) {
-            primaryBitmap[fieldNumber - 1] = true;
-        } else {
-            secondaryBitmap[fieldNumber - 65] = true;
-            primaryBitmap[0] = true; // Ensure secondary bitmap is marked active
-        }
+        setBit(fieldNumber);
     }
 
     private static String generateRandomValue(JsonNode config) {
@@ -177,14 +174,13 @@ public class CreateIsoMessage {
         message.append(isoFields.getOrDefault(0, DEFAULT_MTI));
 
         // Ensure bitmap is only generated if at least one field is present in DE 1-64
-        boolean hasPrimaryFields = hasActivePrimaryFields();
-        if (hasPrimaryFields) {
-            message.append(bitmapToHex(primaryBitmap));
+        if (hasActivePrimaryFields()) {
+            message.append(getPrimaryBitmapHex());
         }
 
         // Only include Secondary Bitmap if DE 65-128 are present
         if (hasActiveSecondaryFields()) {
-            message.append(bitmapToHex(secondaryBitmap));
+            message.append(getSecondaryBitmapHex());
         }
 
         // Append each field value
@@ -206,7 +202,7 @@ public class CreateIsoMessage {
 
     private static boolean hasActiveSecondaryFields() {
         for (int i = 0; i < 64; i++) {
-            if (secondaryBitmap[i] && isoFields.containsKey(i + 65)) { // Check fields 65-128
+            if (isSecondaryBitSet(i) && isoFields.containsKey(i + 65)) { // Check fields 65-128
                 return true; // Secondary bitmap is required
             }
         }
@@ -225,12 +221,12 @@ public class CreateIsoMessage {
 
         // Print Primary Bitmap only if active
         if (hasActivePrimaryFields()) {
-            outputJson.put("PrimaryBitmap", bitmapToHex(primaryBitmap));
+            outputJson.put("PrimaryBitmap", getPrimaryBitmapHex());
         }
 
         // Print Secondary Bitmap only if required
         if (hasActiveSecondaryFields()) {
-            outputJson.put("SecondaryBitmap", bitmapToHex(secondaryBitmap));
+            outputJson.put("SecondaryBitmap", getSecondaryBitmapHex());
         }
 
         // Loop through all fields except MTI (Field_0)
@@ -299,7 +295,7 @@ public class CreateIsoMessage {
 
     private static boolean hasActivePrimaryFields() {
         for (int i = 0; i < 64; i++) {
-            if (primaryBitmap[i] && isoFields.containsKey(i + 1)) { // Check fields 1-64
+            if (isPrimaryBitSet(i) && isoFields.containsKey(i + 1)) { // Check fields 1-64
                 return true;
             }
         }
@@ -410,8 +406,7 @@ public class CreateIsoMessage {
                 // Clear previous field data for new row
                 isoFields.clear();
                 manuallyUpdatedFields.clear();
-                Arrays.fill(primaryBitmap, false);
-                Arrays.fill(secondaryBitmap, false);
+                resetBitmaps(); // Reset bitmaps for each new row
 
                 int processedFields = 0;
 
