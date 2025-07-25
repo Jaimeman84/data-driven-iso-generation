@@ -34,6 +34,9 @@ public class CreateIsoMessage {
     static final Map<Integer, String> isoFields = new TreeMap<>();
     private static final Set<String> manuallyUpdatedFields = new HashSet<>(); // Tracks modified fields
     private static final String DEFAULT_MTI = "0100"; // Default MTI value
+    
+    // Add storage for validation results
+    private static final Map<Integer, ValidationResult> validationResults = new HashMap<>();
 
     public static void createIsoMessage(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
@@ -564,6 +567,7 @@ public class CreateIsoMessage {
                                 skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
                         );
                         validationCell.setCellValue(validationSummary);
+                        validationResults.put(rowIndex + 1, validationResult); // Store result with row number
                     } catch (Exception e) {
                         System.out.println("\nValidation failed: " + e.getMessage());
                         Cell validationCell = dataRow.createCell(90); // Column CM
@@ -899,5 +903,35 @@ public class CreateIsoMessage {
         }
 
         return current;
+    }
+
+    /**
+     * Gets the aggregated results from the last spreadsheet processing run
+     * @return Aggregated validation results summary as a string
+     */
+    public static String getAggregatedResults() {
+        if (validationResults.isEmpty()) {
+            return "No validation results available. Please process a spreadsheet first.";
+        }
+        AggregatedResults aggregated = ValidationResultManager.aggregateResults(validationResults);
+        return aggregated.getSummary();
+    }
+
+    /**
+     * Gets the detailed aggregated results object for programmatic access
+     * @return AggregatedResults object containing all validation details
+     */
+    public static AggregatedResults getDetailedResults() {
+        if (validationResults.isEmpty()) {
+            return new AggregatedResults(0, 0);
+        }
+        return ValidationResultManager.aggregateResults(validationResults);
+    }
+
+    /**
+     * Clears all stored validation results
+     */
+    public static void clearResults() {
+        validationResults.clear();
     }
 }

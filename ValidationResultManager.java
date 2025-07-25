@@ -235,4 +235,132 @@ public class ValidationResultManager {
             row.createCell(6).setCellValue(details.toString());
         }
     }
+
+    /**
+     * Class to hold aggregated validation results across multiple ISO messages
+     */
+    @Getter
+    public static class AggregatedResults {
+        private final int totalMessages;
+        private final int totalFields;
+        private final Map<String, Integer> passedByDE = new HashMap<>();
+        private final Map<String, Integer> failedByDE = new HashMap<>();
+        private final Map<String, Integer> skippedByDE = new HashMap<>();
+        private final Map<String, List<String>> failureReasonsByDE = new HashMap<>();
+        private final Map<Integer, Map<String, FieldResult>> resultsByRow = new HashMap<>();
+
+        public AggregatedResults(int totalMessages, int totalFields) {
+            this.totalMessages = totalMessages;
+            this.totalFields = totalFields;
+        }
+
+        public void addResult(int rowNumber, String de, FieldResult result) {
+            // Store result by row
+            resultsByRow.computeIfAbsent(rowNumber, k -> new HashMap<>()).put(de, result);
+
+            // Update counters based on status
+            switch (result.getStatus()) {
+                case PASSED:
+                    passedByDE.merge(de, 1, Integer::sum);
+                    break;
+                case FAILED:
+                    failedByDE.merge(de, 1, Integer::sum);
+                    failureReasonsByDE.computeIfAbsent(de, k -> new ArrayList<>())
+                            .add(String.format("Row %d: %s", rowNumber, result.getActual()));
+                    break;
+                case SKIPPED:
+                    skippedByDE.merge(de, 1, Integer::sum);
+                    break;
+            }
+        }
+
+        /**
+         * Gets the success rate for a specific DE
+         */
+        public double getSuccessRate(String de) {
+            int total = passedByDE.getOrDefault(de, 0) + failedByDE.getOrDefault(de, 0) + skippedByDE.getOrDefault(de, 0);
+            return total > 0 ? (double) passedByDE.getOrDefault(de, 0) / total : 0.0;
+        }
+
+        /**
+         * Gets DEs sorted by failure rate (highest first)
+         */
+        public List<String> getDEsByFailureRate() {
+            List<String> des = new ArrayList<>(failedByDE.keySet());
+            des.sort((de1, de2) -> {
+                double rate1 = 1.0 - getSuccessRate(de1);
+                double rate2 = 1.0 - getSuccessRate(de2);
+                return Double.compare(rate2, rate1);
+            });
+            return des;
+        }
+
+        /**
+         * Gets a summary of the aggregated results
+         */
+        public String getSummary() {
+            StringBuilder summary = new StringBuilder();
+            summary.append("\n=== Aggregated Validation Results ===\n");
+            summary.append(String.format("Total ISO Messages: %d\n", totalMessages));
+            summary.append(String.format("Total Fields Validated: %d\n", totalFields));
+
+            // Overall statistics
+            int totalPassed = passedByDE.values().stream().mapToInt(Integer::intValue).sum();
+            int totalFailed = failedByDE.values().stream().mapToInt(Integer::intValue).sum();
+            int totalSkipped = skippedByDE.values().stream().mapToInt(Integer::intValue).sum();
+
+            summary.append(String.format("\nOverall Results:\n"));
+            summary.append(String.format("Passed: %d (%.2f%%)\n", totalPassed, (double) totalPassed / totalFields * 100));
+            summary.append(String.format("Failed: %d (%.2f%%)\n", totalFailed, (double) totalFailed / totalFields * 100));
+            summary.append(String.format("Skipped: %d (%.2f%%)\n", totalSkipped, (double) totalSkipped / totalFields * 100));
+
+            // Results by DE
+            summary.append("\nResults by Data Element:\n");
+            List<String> desByFailure = getDEsByFailureRate();
+            for (String de : desByFailure) {
+                int passed = passedByDE.getOrDefault(de, 0);
+                int failed = failedByDE.getOrDefault(de, 0);
+                int skipped = skippedByDE.getOrDefault(de, 0);
+                int total = passed + failed + skipped;
+                double successRate = getSuccessRate(de);
+
+                summary.append(String.format("\nDE %s:\n", de));
+                summary.append(String.format("  Total: %d\n", total));
+                summary.append(String.format("  Success Rate: %.2f%%\n", successRate * 100));
+                summary.append(String.format("  Passed: %d\n", passed));
+                summary.append(String.format("  Failed: %d\n", failed));
+                summary.append(String.format("  Skipped: %d\n", skipped));
+
+                if (failed > 0) {
+                    summary.append("  Failure Reasons:\n");
+                    failureReasonsByDE.get(de).forEach(reason -> 
+                        summary.append("    - ").append(reason).append("\n"));
+                }
+            }
+
+            return summary.toString();
+        }
+    }
+
+    /**
+     * Aggregates results from multiple validation runs
+     * @param results Map of row numbers to validation results
+     * @return Aggregated results object
+     */
+    public static AggregatedResults aggregateResults(Map<Integer, ValidationResult> results) {
+        int totalFields = results.values().stream()
+                .mapToInt(r -> r.getResults().size())
+                .sum();
+
+        AggregatedResults aggregated = new AggregatedResults(results.size(), totalFields);
+
+        // Process each row's results
+        results.forEach((rowNumber, validationResult) -> {
+            validationResult.getResults().forEach((de, fieldResult) -> {
+                aggregated.addResult(rowNumber, de, fieldResult);
+            });
+        });
+
+        return aggregated;
+    }
 } 
