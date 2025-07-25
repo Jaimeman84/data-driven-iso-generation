@@ -582,6 +582,11 @@ public class CreateIsoMessage {
             try (FileOutputStream fos = new FileOutputStream(filePath)) {
                 workbook.write(fos);
                 System.out.println("\nSuccessfully wrote all ISO messages and validation results to spreadsheet");
+                
+                // Add aggregate results logging
+                System.out.println("\n=== Aggregate Validation Results ===");
+                AggregatedResults aggregated = ValidationResultManager.aggregateResults(validationResults);
+                System.out.println(aggregated.getSummary());
             }
         } catch (Exception e) {
             System.err.println("\nError processing spreadsheet: " + e.getMessage());

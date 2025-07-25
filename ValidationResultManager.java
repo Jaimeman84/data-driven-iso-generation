@@ -283,10 +283,16 @@ public class ValidationResultManager {
         }
 
         /**
-         * Gets DEs sorted by failure rate (highest first)
+         * Gets DEs sorted by failure rate (highest first), including all processed DEs
          */
         public List<String> getDEsByFailureRate() {
-            List<String> des = new ArrayList<>(failedByDE.keySet());
+            // Collect all unique DEs from passed, failed, and skipped results
+            Set<String> allDEs = new HashSet<>();
+            allDEs.addAll(passedByDE.keySet());
+            allDEs.addAll(failedByDE.keySet());
+            allDEs.addAll(skippedByDE.keySet());
+
+            List<String> des = new ArrayList<>(allDEs);
             des.sort((de1, de2) -> {
                 double rate1 = 1.0 - getSuccessRate(de1);
                 double rate2 = 1.0 - getSuccessRate(de2);
@@ -315,26 +321,30 @@ public class ValidationResultManager {
             summary.append(String.format("Skipped: %d (%.2f%%)\n", totalSkipped, (double) totalSkipped / totalFields * 100));
 
             // Results by DE
-            summary.append("\nResults by Data Element:\n");
-            List<String> desByFailure = getDEsByFailureRate();
-            for (String de : desByFailure) {
-                int passed = passedByDE.getOrDefault(de, 0);
-                int failed = failedByDE.getOrDefault(de, 0);
-                int skipped = skippedByDE.getOrDefault(de, 0);
-                int total = passed + failed + skipped;
-                double successRate = getSuccessRate(de);
+            List<String> allDEs = getDEsByFailureRate();
+            if (allDEs.isEmpty()) {
+                summary.append("\nNo Data Elements were processed.\n");
+            } else {
+                summary.append("\nResults by Data Element:\n");
+                for (String de : allDEs) {
+                    int passed = passedByDE.getOrDefault(de, 0);
+                    int failed = failedByDE.getOrDefault(de, 0);
+                    int skipped = skippedByDE.getOrDefault(de, 0);
+                    int total = passed + failed + skipped;
+                    double successRate = getSuccessRate(de);
 
-                summary.append(String.format("\nDE %s:\n", de));
-                summary.append(String.format("  Total: %d\n", total));
-                summary.append(String.format("  Success Rate: %.2f%%\n", successRate * 100));
-                summary.append(String.format("  Passed: %d\n", passed));
-                summary.append(String.format("  Failed: %d\n", failed));
-                summary.append(String.format("  Skipped: %d\n", skipped));
+                    summary.append(String.format("\nDE %s:\n", de));
+                    summary.append(String.format("  Total: %d\n", total));
+                    summary.append(String.format("  Success Rate: %.2f%%\n", successRate * 100));
+                    summary.append(String.format("  Passed: %d\n", passed));
+                    summary.append(String.format("  Failed: %d\n", failed));
+                    summary.append(String.format("  Skipped: %d\n", skipped));
 
-                if (failed > 0) {
-                    summary.append("  Failure Reasons:\n");
-                    failureReasonsByDE.get(de).forEach(reason -> 
-                        summary.append("    - ").append(reason).append("\n"));
+                    if (failed > 0 && failureReasonsByDE.containsKey(de)) {
+                        summary.append("  Failure Reasons:\n");
+                        failureReasonsByDE.get(de).forEach(reason -> 
+                            summary.append("    - ").append(reason).append("\n"));
+                    }
                 }
             }
 
