@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.apache.poi.ss.usermodel.*;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ValidationResultManager {
     /**
@@ -46,12 +47,46 @@ public class ValidationResultManager {
         public String getActual() { return actual; }
     }
 
+    @Getter
+    public static class RowSummary {
+        private final int rowNumber;
+        private final int totalFields;
+        private final long passCount;
+        private final long failCount;
+        private final long skipCount;
+        private final String failedDEs;
+        private final String skippedDEs;
+
+        public RowSummary(int rowNumber, int totalFields, long passCount, long failCount, long skipCount, String failedDEs, String skippedDEs) {
+            this.rowNumber = rowNumber;
+            this.totalFields = totalFields;
+            this.passCount = passCount;
+            this.failCount = failCount;
+            this.skipCount = skipCount;
+            this.failedDEs = failedDEs;
+            this.skippedDEs = skippedDEs;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("Row %d - Total Fields: %d, Passed: %d, Failed: %d%s, Skipped: %d%s",
+                    rowNumber,
+                    totalFields,
+                    passCount,
+                    failCount,
+                    failCount > 0 ? " (DE " + failedDEs + ")" : "",
+                    skipCount,
+                    skipCount > 0 ? " (DE " + skippedDEs + ")" : "");
+        }
+    }
+
     /**
      * Class to hold validation results
      */
     @Getter
     public static class ValidationResult {
         private final Map<String, FieldResult> results = new HashMap<>();
+        private RowSummary lastRowSummary;
 
         /**
          * Clears all validation results
@@ -72,13 +107,17 @@ public class ValidationResultManager {
             results.put(de, new FieldResult(FieldStatus.SKIPPED, expected, reason));
         }
 
+        public RowSummary getLastRowSummary() {
+            return lastRowSummary;
+        }
+
         public void printResults() {
+            // Get current row index from the thread local storage
+            Integer currentRowIndex = CreateIsoMessage.currentRowIndex.get();
+
             System.out.println("\n=== Validation Results ===");
             System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n", "DE", "Status", "ISO Value", "Canonical Value", "Mapping");
             System.out.println("-".repeat(120));
-
-            // Get current row index from the thread local storage
-            Integer currentRowIndex = CreateIsoMessage.currentRowIndex.get();
 
             // Create a sorted map with custom comparator for numeric DE sorting
             Map<String, FieldResult> sortedResults = new TreeMap<>((de1, de2) -> {
@@ -126,7 +165,7 @@ public class ValidationResultManager {
                 }
             });
 
-            // Print summary
+            // Calculate summary
             long passCount = results.values().stream()
                     .filter(r -> r.getStatus() == FieldStatus.PASSED)
                     .count();
@@ -137,23 +176,27 @@ public class ValidationResultManager {
                     .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
                     .count();
 
-            // Store these accurate counts in the aggregated results
-            if (CreateIsoMessage.validationResults != null && currentRowIndex != null) {
-                ValidationResult newResult = new ValidationResult();
-                results.forEach((de, fieldResult) -> {
-                    switch (fieldResult.getStatus()) {
-                        case PASSED:
-                            newResult.addPassedField(de, fieldResult.getExpected(), fieldResult.getActual());
-                            break;
-                        case FAILED:
-                            newResult.addFailedField(de, fieldResult.getExpected(), fieldResult.getActual());
-                            break;
-                        case SKIPPED:
-                            newResult.addSkippedField(de, fieldResult.getExpected(), fieldResult.getActual());
-                            break;
-                    }
-                });
-                CreateIsoMessage.validationResults.put(currentRowIndex + 1, newResult);
+            // Get failed and skipped DEs
+            String failedDEs = results.entrySet().stream()
+                    .filter(e -> e.getValue().getStatus() == FieldStatus.FAILED)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.joining(", "));
+            String skippedDEs = results.entrySet().stream()
+                    .filter(e -> e.getValue().getStatus() == FieldStatus.SKIPPED)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.joining(", "));
+
+            // Store the summary
+            if (currentRowIndex != null) {
+                lastRowSummary = new RowSummary(
+                    currentRowIndex + 1,
+                    results.size(),
+                    passCount,
+                    failCount,
+                    skipCount,
+                    failedDEs,
+                    skippedDEs
+                );
             }
 
             System.out.println("\nSummary:");
@@ -277,10 +320,21 @@ public class ValidationResultManager {
         private final Map<String, Integer> skippedByDE = new HashMap<>();
         private final Map<String, List<String>> failureReasonsByDE = new HashMap<>();
         private final Map<Integer, Map<String, FieldResult>> resultsByRow = new HashMap<>();
+        private final List<RowSummary> rowSummaries = new ArrayList<>();
 
         public AggregatedResults(int totalMessages, int totalFields) {
             this.totalMessages = totalMessages;
             this.totalFields = totalFields;
+        }
+
+        public void addRowSummary(RowSummary summary) {
+            if (summary != null) {
+                rowSummaries.add(summary);
+            }
+        }
+
+        public List<RowSummary> getRowSummaries() {
+            return Collections.unmodifiableList(rowSummaries);
         }
 
         public void addResult(int rowNumber, String de, FieldResult result) {
@@ -414,6 +468,10 @@ public class ValidationResultManager {
             validationResult.getResults().forEach((de, fieldResult) -> {
                 aggregated.addResult(rowNumber, de, fieldResult);
             });
+            // Add the row summary if available
+            if (validationResult.getLastRowSummary() != null) {
+                aggregated.addRowSummary(validationResult.getLastRowSummary());
+            }
         });
 
         return aggregated;
