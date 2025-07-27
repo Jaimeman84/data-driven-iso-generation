@@ -317,10 +317,26 @@ public class ValidationResultManager {
             summary.append(String.format("Total ISO Messages: %d\n", totalMessages));
             summary.append(String.format("Total Fields Validated: %d\n", totalFields));
 
-            // Overall statistics
-            int totalPassed = passedByDE.values().stream().mapToInt(Integer::intValue).sum();
-            int totalFailed = failedByDE.values().stream().mapToInt(Integer::intValue).sum();
-            int totalSkipped = skippedByDE.values().stream().mapToInt(Integer::intValue).sum();
+            // Calculate overall statistics from resultsByRow to avoid overcounting
+            int totalPassed = 0;
+            int totalFailed = 0;
+            int totalSkipped = 0;
+
+            for (Map<String, FieldResult> rowResults : resultsByRow.values()) {
+                for (FieldResult result : rowResults.values()) {
+                    switch (result.getStatus()) {
+                        case PASSED:
+                            totalPassed++;
+                            break;
+                        case FAILED:
+                            totalFailed++;
+                            break;
+                        case SKIPPED:
+                            totalSkipped++;
+                            break;
+                    }
+                }
+            }
 
             summary.append(String.format("\nOverall Results:\n"));
             summary.append(String.format("Passed: %d (%.2f%%)\n", totalPassed, (double) totalPassed / totalFields * 100));
