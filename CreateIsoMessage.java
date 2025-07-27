@@ -571,8 +571,23 @@ public class CreateIsoMessage {
                         );
                         validationCell.setCellValue(validationSummary);
                         // Store the result for aggregation
-                        validationResults.put(rowIndex + 1, new ValidationResult());
-                        validationResults.get(rowIndex + 1).getResults().putAll(validationResult.getResults());
+                        ValidationResult newResult = new ValidationResult();
+                        Map<? extends String, ? extends ValidationResultManager.FieldResult> sourceMap = validationResult.getResults();
+                        for (String key : sourceMap.keySet()) {
+                            ValidationResultManager.FieldResult fieldResult = sourceMap.get(key);
+                            switch (fieldResult.getStatus()) {
+                                case PASSED:
+                                    newResult.addPassedField(key, fieldResult.getExpected(), fieldResult.getActual());
+                                    break;
+                                case FAILED:
+                                    newResult.addFailedField(key, fieldResult.getExpected(), fieldResult.getActual());
+                                    break;
+                                case SKIPPED:
+                                    newResult.addSkippedField(key, fieldResult.getExpected(), fieldResult.getActual());
+                                    break;
+                            }
+                        }
+                        validationResults.put(rowIndex + 1, newResult);
                     } catch (Exception e) {
                         System.out.println("\nValidation failed: " + e.getMessage());
                         Cell validationCell = dataRow.createCell(90); // Column CM
