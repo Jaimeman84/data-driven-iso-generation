@@ -77,6 +77,9 @@ public class ValidationResultManager {
             System.out.printf("%-6s | %-15s | %-40s | %-40s | %s%n", "DE", "Status", "ISO Value", "Canonical Value", "Mapping");
             System.out.println("-".repeat(120));
 
+            // Get current row index from the thread local storage
+            Integer currentRowIndex = CreateIsoMessage.currentRowIndex.get();
+
             // Create a sorted map with custom comparator for numeric DE sorting
             Map<String, FieldResult> sortedResults = new TreeMap<>((de1, de2) -> {
                 // Handle MTI specially
@@ -133,6 +136,25 @@ public class ValidationResultManager {
             long skipCount = results.values().stream()
                     .filter(r -> r.getStatus() == FieldStatus.SKIPPED)
                     .count();
+
+            // Store these accurate counts in the aggregated results
+            if (CreateIsoMessage.validationResults != null && currentRowIndex != null) {
+                ValidationResult newResult = new ValidationResult();
+                results.forEach((de, fieldResult) -> {
+                    switch (fieldResult.getStatus()) {
+                        case PASSED:
+                            newResult.addPassedField(de, fieldResult.getExpected(), fieldResult.getActual());
+                            break;
+                        case FAILED:
+                            newResult.addFailedField(de, fieldResult.getExpected(), fieldResult.getActual());
+                            break;
+                        case SKIPPED:
+                            newResult.addSkippedField(de, fieldResult.getExpected(), fieldResult.getActual());
+                            break;
+                    }
+                });
+                CreateIsoMessage.validationResults.put(currentRowIndex + 1, newResult);
+            }
 
             System.out.println("\nSummary:");
             System.out.println("Total Fields: " + results.size());

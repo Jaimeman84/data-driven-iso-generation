@@ -36,7 +36,10 @@ public class CreateIsoMessage {
     private static final String DEFAULT_MTI = "0100"; // Default MTI value
     
     // Add storage for validation results
-    private static final Map<Integer, ValidationResult> validationResults = new HashMap<>();
+    public static final Map<Integer, ValidationResult> validationResults = new HashMap<>();
+    
+    // Thread local storage for current row index
+    public static final ThreadLocal<Integer> currentRowIndex = new ThreadLocal<>();
 
     public static void createIsoMessage(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
@@ -531,9 +534,15 @@ public class CreateIsoMessage {
                     }
 
                     try {
+                        // Set current row index
+                        currentRowIndex.set(rowIndex);
+                        
                         // Validate against canonical form
                         ValidationResult validationResult = validateIsoMessageCanonical(isoMessage, dataRow);
                         validationResult.printResults();
+
+                        // Clear current row index
+                        currentRowIndex.remove();
 
                         // Export validation results to Excel
                         exportValidationResultsToExcel(workbook, validationResult, rowIndex);
