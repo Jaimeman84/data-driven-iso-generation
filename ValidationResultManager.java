@@ -53,6 +53,13 @@ public class ValidationResultManager {
     public static class ValidationResult {
         private final Map<String, FieldResult> results = new HashMap<>();
 
+        /**
+         * Clears all validation results
+         */
+        public void clear() {
+            results.clear();
+        }
+
         public void addPassedField(String de, String expected, String actual) {
             results.put(de, new FieldResult(FieldStatus.PASSED, expected, actual));
         }

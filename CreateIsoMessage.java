@@ -362,6 +362,9 @@ public class CreateIsoMessage {
         System.out.println("\n=== Starting ISO message generation and validation from spreadsheet ===");
         System.out.println("File: " + filePath);
 
+        // Clear previous results before starting new run
+        validationResults.clear();
+
         // Load the ISO configuration
         loadConfig("iso_config.json");
 
@@ -567,7 +570,9 @@ public class CreateIsoMessage {
                                 skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
                         );
                         validationCell.setCellValue(validationSummary);
-                        validationResults.put(rowIndex + 1, validationResult); // Store result with row number
+                        // Store the result for aggregation
+                        validationResults.put(rowIndex + 1, new ValidationResult());
+                        validationResults.get(rowIndex + 1).getResults().putAll(validationResult.getResults());
                     } catch (Exception e) {
                         System.out.println("\nValidation failed: " + e.getMessage());
                         Cell validationCell = dataRow.createCell(90); // Column CM
@@ -578,15 +583,17 @@ public class CreateIsoMessage {
                 }
             }
 
-            // Save the workbook
+            // Save the workbook and print aggregate results
             try (FileOutputStream fos = new FileOutputStream(filePath)) {
                 workbook.write(fos);
                 System.out.println("\nSuccessfully wrote all ISO messages and validation results to spreadsheet");
-                
-                // Add aggregate results logging
-                System.out.println("\n=== Aggregate Validation Results ===");
-                AggregatedResults aggregated = ValidationResultManager.aggregateResults(validationResults);
-                System.out.println(aggregated.getSummary());
+
+                // Print aggregate results
+                if (!validationResults.isEmpty()) {
+                    System.out.println("\n=== Aggregate Validation Results ===");
+                    AggregatedResults aggregated = ValidationResultManager.aggregateResults(validationResults);
+                    System.out.println(aggregated.getSummary());
+                }
             }
         } catch (Exception e) {
             System.err.println("\nError processing spreadsheet: " + e.getMessage());
@@ -621,6 +628,7 @@ public class CreateIsoMessage {
      */
     public static ValidationResult validateIsoMessageCanonical(String isoMessage, Row excelRow) throws IOException {
         ValidationResult result = new ValidationResult();
+        result.clear(); // Ensure we start with a clean result
 
         // Get canonical response
         String canonicalResponse = sendIsoMessageToCanonical(isoMessage);
