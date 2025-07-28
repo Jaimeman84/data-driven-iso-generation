@@ -40,13 +40,37 @@ public class CreateIsoMessage {
     
     // Thread local storage for current row index
     public static final ThreadLocal<Integer> currentRowIndex = new ThreadLocal<>();
+    
+    // Store validation summaries for each row
+    private static final Map<Integer, RowValidationSummary> rowValidationSummaries = new HashMap<>();
+    
+    @Getter
+    public static class RowValidationSummary {
+        private final int rowNumber;
+        private final int totalFields;
+        private final long passCount;
+        private final long failCount;
+        private final long skipCount;
+        private final String failedDEs;
+        private final String skippedDEs;
+        
+        public RowValidationSummary(int rowNumber, int totalFields, long passCount, long failCount, long skipCount, String failedDEs, String skippedDEs) {
+            this.rowNumber = rowNumber;
+            this.totalFields = totalFields;
+            this.passCount = passCount;
+            this.failCount = failCount;
+            this.skipCount = skipCount;
+            this.failedDEs = failedDEs;
+            this.skippedDEs = skippedDEs;
+        }
+    }
 
     /**
      * Gets the total validation results across all rows
      * @return A summary string with total counts
      */
     public static String getTotalValidationSummary() {
-        if (validationResults.isEmpty()) {
+        if (rowValidationSummaries.isEmpty()) {
             return "No validation results available";
         }
 
@@ -57,33 +81,21 @@ public class CreateIsoMessage {
         Set<String> allFailedDEs = new HashSet<>();
         Set<String> allSkippedDEs = new HashSet<>();
 
-        // Aggregate counts from each row's results
-        for (ValidationResult result : validationResults.values()) {
-            Map<String, FieldResult> rowResults = result.getResults();
-            totalFields += rowResults.size();
+        // Sum up the counts from each row's summary
+        for (RowValidationSummary summary : rowValidationSummaries.values()) {
+            totalFields += summary.getTotalFields();
+            totalPassed += summary.getPassCount();
+            totalFailed += summary.getFailCount();
+            totalSkipped += summary.getSkipCount();
             
-            // Count statuses
-            for (Map.Entry<String, FieldResult> entry : rowResults.entrySet()) {
-                String de = entry.getKey();
-                FieldResult fieldResult = entry.getValue();
-                
-                switch (fieldResult.getStatus()) {
-                    case PASSED:
-                        totalPassed++;
-                        break;
-                    case FAILED:
-                        totalFailed++;
-                        allFailedDEs.add(de);
-                        break;
-                    case SKIPPED:
-                        totalSkipped++;
-                        allSkippedDEs.add(de);
-                        break;
-                }
+            if (!summary.getFailedDEs().isEmpty()) {
+                allFailedDEs.addAll(Arrays.asList(summary.getFailedDEs().split(", ")));
+            }
+            if (!summary.getSkippedDEs().isEmpty()) {
+                allSkippedDEs.addAll(Arrays.asList(summary.getSkippedDEs().split(", ")));
             }
         }
 
-        // Format the summary string
         return String.format(
             "=== Total Validation Results ===\n" +
             "Total Rows: %d\n" +
@@ -91,7 +103,7 @@ public class CreateIsoMessage {
             "Total Passed: %d\n" +
             "Total Failed: %d%s\n" +
             "Total Skipped: %d%s",
-            validationResults.size(),
+            rowValidationSummaries.size(),
             totalFields,
             totalPassed,
             totalFailed,
@@ -639,6 +651,18 @@ public class CreateIsoMessage {
                                 skipCount > 0 ? " (DE " + skippedDEs + ")" : ""
                         );
                         validationCell.setCellValue(validationSummary);
+                        
+                        // Store the row summary
+                        rowValidationSummaries.put(rowIndex + 1, new RowValidationSummary(
+                            rowIndex + 1,
+                            validationResult.getResults().size(),
+                            passCount,
+                            failCount,
+                            skipCount,
+                            failedDEs,
+                            skippedDEs
+                        ));
+
                         // Store the result for aggregation
                         ValidationResult newResult = new ValidationResult();
                         Map<? extends String, ? extends ValidationResultManager.FieldResult> sourceMap = validationResult.getResults();
