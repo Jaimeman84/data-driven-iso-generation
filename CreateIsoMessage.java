@@ -41,6 +41,66 @@ public class CreateIsoMessage {
     // Thread local storage for current row index
     public static final ThreadLocal<Integer> currentRowIndex = new ThreadLocal<>();
 
+    /**
+     * Gets the total validation results across all rows
+     * @return A summary string with total counts
+     */
+    public static String getTotalValidationSummary() {
+        if (validationResults.isEmpty()) {
+            return "No validation results available";
+        }
+
+        long totalFields = 0;
+        long totalPassed = 0;
+        long totalFailed = 0;
+        long totalSkipped = 0;
+        Set<String> allFailedDEs = new HashSet<>();
+        Set<String> allSkippedDEs = new HashSet<>();
+
+        // Aggregate counts from each row's results
+        for (ValidationResult result : validationResults.values()) {
+            Map<String, FieldResult> rowResults = result.getResults();
+            totalFields += rowResults.size();
+            
+            // Count statuses
+            for (Map.Entry<String, FieldResult> entry : rowResults.entrySet()) {
+                String de = entry.getKey();
+                FieldResult fieldResult = entry.getValue();
+                
+                switch (fieldResult.getStatus()) {
+                    case PASSED:
+                        totalPassed++;
+                        break;
+                    case FAILED:
+                        totalFailed++;
+                        allFailedDEs.add(de);
+                        break;
+                    case SKIPPED:
+                        totalSkipped++;
+                        allSkippedDEs.add(de);
+                        break;
+                }
+            }
+        }
+
+        // Format the summary string
+        return String.format(
+            "=== Total Validation Results ===\n" +
+            "Total Rows: %d\n" +
+            "Total Fields: %d\n" +
+            "Total Passed: %d\n" +
+            "Total Failed: %d%s\n" +
+            "Total Skipped: %d%s",
+            validationResults.size(),
+            totalFields,
+            totalPassed,
+            totalFailed,
+            !allFailedDEs.isEmpty() ? " (DE " + String.join(", ", allFailedDEs) + ")" : "",
+            totalSkipped,
+            !allSkippedDEs.isEmpty() ? " (DE " + String.join(", ", allSkippedDEs) + ")" : ""
+        );
+    }
+
     public static void createIsoMessage(String requestName, DataTable dt) throws IOException {
         loadConfig("iso_config.json");
 
@@ -612,12 +672,8 @@ public class CreateIsoMessage {
                 workbook.write(fos);
                 System.out.println("\nSuccessfully wrote all ISO messages and validation results to spreadsheet");
 
-                // Print aggregate results
-                if (!validationResults.isEmpty()) {
-                    System.out.println("\n=== Aggregate Validation Results ===");
-                    AggregatedResults aggregated = ValidationResultManager.aggregateResults(validationResults);
-                    System.out.println(aggregated.getSummary());
-                }
+                // Print total validation results
+                System.out.println("\n" + getTotalValidationSummary());
             }
         } catch (Exception e) {
             System.err.println("\nError processing spreadsheet: " + e.getMessage());
