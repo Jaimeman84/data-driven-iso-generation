@@ -393,25 +393,15 @@ public class ValidationResultManager {
             summary.append(String.format("Total ISO Messages: %d\n", totalMessages));
             summary.append(String.format("Total Fields Validated: %d\n", totalFields));
 
-            // Calculate overall statistics from resultsByRow to avoid overcounting
+            // Calculate overall statistics from row summaries
             int totalPassed = 0;
             int totalFailed = 0;
             int totalSkipped = 0;
 
-            for (Map<String, FieldResult> rowResults : resultsByRow.values()) {
-                for (FieldResult result : rowResults.values()) {
-                    switch (result.getStatus()) {
-                        case PASSED:
-                            totalPassed++;
-                            break;
-                        case FAILED:
-                            totalFailed++;
-                            break;
-                        case SKIPPED:
-                            totalSkipped++;
-                            break;
-                    }
-                }
+            for (RowSummary rowSummary : rowSummaries) {
+                totalPassed += rowSummary.getPassCount();
+                totalFailed += rowSummary.getFailCount();
+                totalSkipped += rowSummary.getSkipCount();
             }
 
             summary.append(String.format("\nOverall Results:\n"));
@@ -457,6 +447,7 @@ public class ValidationResultManager {
      * @return Aggregated results object
      */
     public static AggregatedResults aggregateResults(Map<Integer, ValidationResult> results) {
+        // Calculate total fields from row summaries to ensure consistency
         int totalFields = results.values().stream()
                 .mapToInt(r -> r.getResults().size())
                 .sum();
@@ -465,12 +456,27 @@ public class ValidationResultManager {
 
         // Process each row's results
         results.forEach((rowNumber, validationResult) -> {
-            validationResult.getResults().forEach((de, fieldResult) -> {
-                aggregated.addResult(rowNumber, de, fieldResult);
-            });
             // Add the row summary if available
             if (validationResult.getLastRowSummary() != null) {
                 aggregated.addRowSummary(validationResult.getLastRowSummary());
+                
+                // Update per-DE statistics
+                Map<String, FieldResult> rowResults = validationResult.getResults();
+                rowResults.forEach((de, fieldResult) -> {
+                    switch (fieldResult.getStatus()) {
+                        case PASSED:
+                            aggregated.passedByDE.merge(de, 1, Integer::sum);
+                            break;
+                        case FAILED:
+                            aggregated.failedByDE.merge(de, 1, Integer::sum);
+                            aggregated.failureReasonsByDE.computeIfAbsent(de, k -> new ArrayList<>())
+                                    .add(String.format("Row %d: %s", rowNumber, fieldResult.getActual()));
+                            break;
+                        case SKIPPED:
+                            aggregated.skippedByDE.merge(de, 1, Integer::sum);
+                            break;
+                    }
+                });
             }
         });
 
